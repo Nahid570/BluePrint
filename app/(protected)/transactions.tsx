@@ -152,19 +152,26 @@ export default function TransactionsScreen() {
 
         return (
             <TouchableOpacity
-                style={[styles.filterOption, isSelected && styles.filterOptionSelected]}
+                style={[
+                    styles.filterOption,
+                    isSelected && styles.filterOptionSelected
+                ]}
                 onPress={() => handleFilterSelect(type)}
             >
                 <View style={[styles.filterIcon, { backgroundColor: colors.bg }]}>
-                    <Ionicons name={icon || getTypeIcon(type) as any} size={scale(18)} color={colors.icon} />
+                    <Ionicons name={icon || getTypeIcon(type) as any} size={scale(20)} color={colors.icon} />
                 </View>
                 <View style={styles.filterContent}>
-                    <Text style={[styles.filterLabel, isSelected && styles.filterLabelSelected]}>
+                    <Text style={styles.filterLabel}>
                         {label}
                     </Text>
                     <Text style={styles.filterCount}>{count} transactions</Text>
                 </View>
-                {isSelected && <Ionicons name="checkmark-circle" size={scale(20)} color="#2563EB" />}
+                {isSelected && (
+                    <View style={styles.checkmarkContainer}>
+                        <Ionicons name="checkmark" size={scale(14)} color="#FFFFFF" />
+                    </View>
+                )}
             </TouchableOpacity>
         );
     };
@@ -274,7 +281,7 @@ export default function TransactionsScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Filter Transactions</Text>
+                            <Text style={styles.modalTitle}>Filter by Category</Text>
                             <TouchableOpacity onPress={() => setShowFilterModal(false)}>
                                 <Ionicons name="close" size={scale(24)} color="#64748B" />
                             </TouchableOpacity>
@@ -284,7 +291,7 @@ export default function TransactionsScreen() {
                                 label="All Transactions"
                                 count={MOCK_DATA.transactions.length}
                                 type="all"
-                                icon="list"
+                                icon="grid"
                             />
                             {MOCK_DATA.categories.map((category) => (
                                 <FilterOption
@@ -478,14 +485,16 @@ const styles = StyleSheet.create({
     },
     filterOption: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: verticalScale(12),
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        padding: moderateScale(12),
+        backgroundColor: '#FFFFFF',
+        borderRadius: moderateScale(12),
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
     },
     filterOptionSelected: {
-        borderBottomColor: '#2563EB',
+        borderColor: '#2563EB',
+        backgroundColor: '#F8FAFC',
     },
     filterIcon: {
         width: scale(40),
@@ -501,16 +510,20 @@ const styles = StyleSheet.create({
     filterLabel: {
         fontSize: moderateScale(14),
         color: '#1E293B',
-        fontFamily: 'Outfit_500Medium',
-        marginBottom: verticalScale(2),
-    },
-    filterLabelSelected: {
-        color: '#2563EB',
         fontFamily: 'Outfit_600SemiBold',
+        marginBottom: verticalScale(2),
     },
     filterCount: {
         fontSize: moderateScale(12),
         color: '#94A3B8',
         fontFamily: 'Outfit_400Regular',
+    },
+    checkmarkContainer: {
+        width: scale(24),
+        height: scale(24),
+        borderRadius: scale(12),
+        backgroundColor: '#2563EB',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
