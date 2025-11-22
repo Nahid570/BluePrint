@@ -1,0 +1,311 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
+
+// Mock detailed transaction data
+const MOCK_TRANSACTION_DETAIL = {
+    id: 1119,
+    transaction_number: "TXN-16-20251116-8EAVRS",
+    reference_number: "SHARE_WITHDRAWAL/16/11/2025/16/326",
+    transaction_type: "share_withdrawal",
+    transaction_type_label: "Share Withdrawal",
+    amount: 31775.63,
+    balance_before: 99129.22,
+    balance_after: 67353.59,
+    currency: "BDT",
+    status: "completed",
+    status_label: "Completed",
+    approval_status: "approved",
+    approval_status_label: "Approved",
+    payment_method: "check",
+    payment_method_label: "Check",
+    payment_reference: "BULK-KA0zUYZDSm",
+    notes: "Bulk generated share_withdrawal transaction",
+    transaction_date: "2025-11-16 09:54:24",
+    created_at: "2025-11-16 09:54:24",
+    created_by: {
+        id: 22,
+        name: "Alax James",
+        email: "domeha8684@wivstore.com"
+    }
+};
+
+const getTypeColor = (type: string) => {
+    const colors: any = {
+        deposit: { bg: '#ECFDF5', icon: '#10B981' },
+        withdrawal: { bg: '#FEF2F2', icon: '#EF4444' },
+        share_deposit: { bg: '#EFF6FF', icon: '#3B82F6' },
+        share_withdrawal: { bg: '#FEF2F2', icon: '#F97316' },
+        investment: { bg: '#F5F3FF', icon: '#8B5CF6' },
+        profit: { bg: '#ECFDF5', icon: '#059669' },
+    };
+    return colors[type] || { bg: '#F8FAFC', icon: '#64748B' };
+};
+
+const getTypeIcon = (type: string) => {
+    const icons: any = {
+        deposit: 'arrow-down-circle',
+        withdrawal: 'arrow-up-circle',
+        share_deposit: 'cube',
+        share_withdrawal: 'cube-outline',
+        investment: 'trending-up',
+        profit: 'cash',
+    };
+    return icons[type] || 'swap-horizontal';
+};
+
+export default function TransactionDetailScreen() {
+    const router = useRouter();
+    const params = useLocalSearchParams();
+    const transaction = MOCK_TRANSACTION_DETAIL; // TODO: Fetch by params.id
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'BDT',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(amount);
+    };
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const colors = getTypeColor(transaction.transaction_type);
+    const isNegative = transaction.transaction_type.includes('withdrawal') || transaction.transaction_type === 'investment';
+
+    const InfoRow = ({ label, value, icon }: { label: string; value: string; icon?: any }) => (
+        <View style={styles.infoRow}>
+            <View style={styles.infoLeft}>
+                {icon && <Ionicons name={icon} size={scale(16)} color="#94A3B8" style={{ marginRight: scale(8) }} />}
+                <Text style={styles.infoLabel}>{label}</Text>
+            </View>
+            <Text style={styles.infoValue}>{value}</Text>
+        </View>
+    );
+
+    return (
+        <SafeAreaView style={styles.container} edges={['bottom']}>
+            <Stack.Screen options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Transaction Details',
+                headerTitleStyle: {
+                    fontFamily: 'Outfit_700Bold',
+                    fontSize: moderateScale(18),
+                    color: '#1E293B',
+                },
+                headerLeft: () => (
+                    <TouchableOpacity onPress={() => router.replace('/(protected)/transactions')} style={{ marginLeft: 10 }}>
+                        <Ionicons name="arrow-back" size={24} color="#1E293B" />
+                    </TouchableOpacity>
+                ),
+            }} />
+
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Transaction Header Card */}
+                <View style={[styles.headerCard, { backgroundColor: colors.bg }]}>
+                    <View style={[styles.headerIcon, { backgroundColor: colors.icon }]}>
+                        <Ionicons name={getTypeIcon(transaction.transaction_type)} size={scale(32)} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.headerType}>{transaction.transaction_type_label}</Text>
+                    <Text style={[styles.headerAmount, { color: isNegative ? '#EF4444' : '#10B981' }]}>
+                        {isNegative ? '-' : '+'}{formatCurrency(transaction.amount)}
+                    </Text>
+                    <View style={[styles.statusBadge, {
+                        backgroundColor: transaction.status === 'completed' ? '#ECFDF5' : '#FEF3C7'
+                    }]}>
+                        <Text style={[styles.statusText, {
+                            color: transaction.status === 'completed' ? '#10B981' : '#F59E0B'
+                        }]}>
+                            {transaction.status_label}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Transaction Information */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Transaction Information</Text>
+                    <View style={styles.card}>
+                        <InfoRow label="Transaction Number" value={transaction.transaction_number} icon="receipt-outline" />
+                        <View style={styles.divider} />
+                        <InfoRow label="Reference Number" value={transaction.reference_number} icon="document-text-outline" />
+                        <View style={styles.divider} />
+                        <InfoRow label="Transaction Date" value={formatDate(transaction.transaction_date)} icon="calendar-outline" />
+                        <View style={styles.divider} />
+                        <InfoRow label="Created At" value={formatDate(transaction.created_at)} icon="time-outline" />
+                    </View>
+                </View>
+
+                {/* Balance Information */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Balance Information</Text>
+                    <View style={styles.card}>
+                        <InfoRow label="Balance Before" value={formatCurrency(transaction.balance_before)} icon="wallet-outline" />
+                        <View style={styles.divider} />
+                        <InfoRow label="Balance After" value={formatCurrency(transaction.balance_after)} icon="wallet" />
+                        <View style={styles.divider} />
+                        <InfoRow label="Currency" value={transaction.currency} icon="cash-outline" />
+                    </View>
+                </View>
+
+                {/* Payment Information */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Payment Information</Text>
+                    <View style={styles.card}>
+                        <InfoRow label="Payment Method" value={transaction.payment_method_label} icon="card-outline" />
+                        <View style={styles.divider} />
+                        <InfoRow label="Payment Reference" value={transaction.payment_reference} icon="barcode-outline" />
+                        <View style={styles.divider} />
+                        <InfoRow label="Approval Status" value={transaction.approval_status_label} icon="checkmark-circle-outline" />
+                    </View>
+                </View>
+
+                {/* Additional Information */}
+                {transaction.notes && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Notes</Text>
+                        <View style={styles.card}>
+                            <Text style={styles.notesText}>{transaction.notes}</Text>
+                        </View>
+                    </View>
+                )}
+
+                {/* Created By */}
+                {transaction.created_by && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Created By</Text>
+                        <View style={styles.card}>
+                            <InfoRow label="Name" value={transaction.created_by.name} icon="person-outline" />
+                            <View style={styles.divider} />
+                            <InfoRow label="Email" value={transaction.created_by.email} icon="mail-outline" />
+                        </View>
+                    </View>
+                )}
+
+                <View style={{ height: 40 }} />
+            </ScrollView>
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+    },
+    scrollContent: {
+        padding: moderateScale(20),
+    },
+    headerCard: {
+        alignItems: 'center',
+        padding: moderateScale(24),
+        borderRadius: moderateScale(20),
+        marginBottom: verticalScale(24),
+    },
+    headerIcon: {
+        width: scale(64),
+        height: scale(64),
+        borderRadius: scale(16),
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: verticalScale(16),
+    },
+    headerType: {
+        fontSize: moderateScale(18),
+        fontWeight: '600',
+        color: '#1E293B',
+        marginBottom: verticalScale(8),
+        fontFamily: 'Outfit_500Medium',
+    },
+    headerAmount: {
+        fontSize: moderateScale(32),
+        fontWeight: '700',
+        marginBottom: verticalScale(12),
+        fontFamily: 'Outfit_700Bold',
+    },
+    statusBadge: {
+        paddingHorizontal: scale(16),
+        paddingVertical: verticalScale(6),
+        borderRadius: scale(12),
+    },
+    statusText: {
+        fontSize: moderateScale(12),
+        fontWeight: '600',
+        fontFamily: 'Outfit_500Medium',
+    },
+    section: {
+        marginBottom: verticalScale(20),
+    },
+    sectionTitle: {
+        fontSize: moderateScale(16),
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: verticalScale(12),
+        fontFamily: 'Outfit_700Bold',
+    },
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: moderateScale(16),
+        padding: moderateScale(16),
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: verticalScale(8),
+    },
+    infoLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 0.4,
+    },
+    infoLabel: {
+        fontSize: moderateScale(12),
+        color: '#64748B',
+        fontFamily: 'Outfit_400Regular',
+    },
+    infoValue: {
+        fontSize: moderateScale(11),
+        fontWeight: '600',
+        color: '#1E293B',
+        textAlign: 'right',
+        flex: 0.6,
+        fontFamily: 'Outfit_500Medium',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+    },
+    notesText: {
+        fontSize: moderateScale(14),
+        color: '#475569',
+        lineHeight: moderateScale(20),
+        fontFamily: 'Outfit_400Regular',
+    },
+});
