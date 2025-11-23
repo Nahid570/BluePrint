@@ -2,7 +2,7 @@ import React from 'react';
 import { useStorageState } from '../hooks/useStorageState';
 
 const AuthContext = React.createContext<{
-    signIn: () => void;
+    signIn: (token?: string) => void;
     signOut: () => void;
     session?: string | null;
     isLoading: boolean;
@@ -30,9 +30,15 @@ export function SessionProvider(props: React.PropsWithChildren) {
     return (
         <AuthContext.Provider
             value={{
-                signIn: () => {
-                    // Perform sign-in logic here
-                    setSession('xxx');
+                signIn: (token?: string) => {
+                    // Store the token if provided, otherwise just mark as signed in
+                    if (token) {
+                        setSession(token);
+                    } else {
+                        // If no token provided, check if token exists in storage
+                        // The token should already be stored by loginInvestor
+                        setSession('authenticated');
+                    }
                 },
                 signOut: () => {
                     setSession(null);

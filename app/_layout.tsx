@@ -1,9 +1,16 @@
-import { Outfit_400Regular, Outfit_500Medium, Outfit_700Bold, useFonts } from '@expo-google-fonts/outfit';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SessionProvider, useSession } from '../context/AuthContext';
+import {
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_700Bold,
+  useFonts,
+} from "@expo-google-fonts/outfit";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SessionProvider, useSession } from "../context/AuthContext";
+import { queryClient } from "../services/api/queryClient";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -42,10 +49,12 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SessionProvider>
-        <RootLayoutNav />
-      </SessionProvider>
-    </GestureHandlerRootView>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SessionProvider>
+          <RootLayoutNav />
+        </SessionProvider>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }
