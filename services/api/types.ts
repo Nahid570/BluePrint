@@ -130,13 +130,48 @@ export interface TransactionDetail extends Transaction {
 
 // Notification Types
 export interface Notification {
-  id: number;
+  id: string;
+  type: string;
   title: string;
   message: string;
-  type: "info" | "success" | "warning" | "error";
-  read: boolean;
+  notification_type: "info" | "success" | "warning" | "error";
+  url: string | null;
+  is_read: boolean;
+  read_at: string | null;
   created_at: string;
+  created_at_human: string;
 }
+
+export interface NotificationsListData {
+  notifications: Notification[];
+  unread_count: number;
+  total_count: number;
+  current_page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export type NotificationsListResponse = ApiResponse<NotificationsListData>;
+
+export interface UnreadCountData {
+  unread_count: number;
+}
+
+export type UnreadCountResponse = ApiResponse<UnreadCountData>;
+
+export interface MarkAsReadData {
+  id: string;
+  is_read: boolean;
+  read_at: string;
+}
+
+export type MarkAsReadResponse = ApiResponse<MarkAsReadData>;
+
+export interface MarkAllAsReadData {
+  marked_count: number;
+}
+
+export type MarkAllAsReadResponse = ApiResponse<MarkAllAsReadData>;
 
 // Pagination Types
 export interface PaginatedResponse<T> {

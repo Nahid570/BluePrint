@@ -29,8 +29,10 @@ export const endpoints = {
   // Notifications endpoints
   notifications: {
     list: "/api/investor/notifications",
-    markAsRead: (id: string | number) => `/api/investor/notifications/${id}/read`,
-    markAllAsRead: "/api/investor/notifications/read-all",
+    unreadCount: "/api/investor/notifications/unread-count",
+    markAsRead: (id: string) => `/api/investor/notifications/${id}/read`,
+    markAllAsRead: "/api/investor/notifications/mark-all-read",
+    delete: (id: string) => `/api/investor/notifications/${id}`,
   },
 
   // Dashboard endpoints
