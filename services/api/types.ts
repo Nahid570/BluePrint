@@ -110,18 +110,35 @@ export interface Club {
 
 export type ClubsListResponse = ApiResponse<Club[]>;
 
-export interface ClubDetail extends Club {
-  location: string;
-  established_date: string;
-  total_investors: number;
-  current_valuation: number;
-  documents?: {
-    id: number;
-    name: string;
-    url: string;
-    type: string;
-  }[];
+export interface ClubDocument {
+  id: number;
+  title: string;
+  description?: string;
+  document_type: string;
+  file_url: string;
+  created_at: string;
 }
+
+export interface ClubActivity {
+  description: string;
+  causer_name: string;
+  causer_email?: string;
+  created_at: string;
+  created_at_human: string;
+}
+
+export interface ClubDetail extends Club {
+  club_type: "live" | "ongoing" | "settled";
+  management_fee: number;
+  performance_fee: number;
+  investment_strategy: string;
+  is_member: boolean;
+  user_personal_documents: ClubDocument[];
+  public_documents: ClubDocument[];
+  activities: ClubActivity[];
+}
+
+export type ClubDetailResponse = ApiResponse<ClubDetail>;
 
 // Transaction Types
 export interface Transaction {

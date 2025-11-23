@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
-import { getClubs } from "../../services/api/clubs";
-import { Club } from "../../services/api/types";
+import { getClubs } from "../../../services/api/clubs";
+import { Club } from "../../../services/api/types";
 
 const getCategoryColor = (color: string) => {
   const colors: any = {
@@ -90,7 +90,7 @@ export default function ClubsScreen() {
     );
 
     const handlePress = () => {
-      router.push(`/(protected)/club-detail?id=${item.id}`);
+      router.push(`/(protected)/clubs/${item.id}`);
     };
 
     return (
