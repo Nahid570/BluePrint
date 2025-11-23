@@ -77,13 +77,6 @@ export default function ProtectedLayout() {
         }}
       />
       <Tabs.Screen
-        name="transaction-detail"
-        options={{
-          href: null,
-          tabBarStyle: { display: "none" },
-        }}
-      />
-      <Tabs.Screen
         name="notifications"
         options={{
           href: null,

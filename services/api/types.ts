@@ -143,22 +143,83 @@ export type ClubDetailResponse = ApiResponse<ClubDetail>;
 // Transaction Types
 export interface Transaction {
   id: number;
-  type: "investment" | "withdrawal" | "dividend" | "refund";
-  club_id?: number;
-  club_name?: string;
+  transaction_number: string;
+  transaction_type: "deposit" | "withdrawal" | "share_deposit" | "share_withdrawal" | "investment" | "profit";
+  transaction_type_label: string;
   amount: number;
-  shares?: number;
+  balance_before: number;
+  balance_after: number;
+  currency: string;
   status: "pending" | "completed" | "failed" | "cancelled";
+  status_label: string;
+  approval_status: "pending" | "approved" | "rejected";
+  approval_status_label: string;
+  payment_method: string;
+  payment_method_label: string;
+  notes: string | null;
+  transaction_date: string;
   created_at: string;
-  updated_at: string;
 }
 
-export interface TransactionDetail extends Transaction {
-  payment_method: string;
-  transaction_id: string;
-  notes?: string;
-  fees?: number;
+export interface TransactionCategory {
+  type: string;
+  label: string;
+  total_amount: number;
+  count: number;
 }
+
+export interface PaginatedTransactions {
+  data: Transaction[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number;
+  to: number;
+}
+
+export interface TransactionsListData {
+  categories: TransactionCategory[];
+  transactions: PaginatedTransactions;
+}
+
+export type TransactionsListResponse = ApiResponse<TransactionsListData>;
+
+export interface CreatedBy {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface TransactionDetail {
+  id: number;
+  transaction_number: string;
+  reference_number: string | null;
+  transaction_type: "deposit" | "withdrawal" | "share_deposit" | "share_withdrawal" | "investment" | "profit";
+  transaction_type_label: string;
+  transaction_subtype: string | null;
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  currency: string;
+  status: "pending" | "completed" | "failed" | "cancelled";
+  status_label: string;
+  approval_status: "pending" | "approved" | "rejected";
+  approval_status_label: string;
+  payment_method: string;
+  payment_method_label: string;
+  payment_reference: string | null;
+  bank_account_id: number | null;
+  notes: string | null;
+  metadata: any | null;
+  transaction_date: string;
+  approved_at: string | null;
+  created_at: string;
+  approved_by: CreatedBy | null;
+  created_by: CreatedBy | null;
+}
+
+export type TransactionDetailResponse = ApiResponse<TransactionDetail>;
 
 // Notification Types
 export interface Notification {
