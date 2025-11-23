@@ -11,12 +11,21 @@ import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SessionProvider, useSession } from "../context/AuthContext";
 import { queryClient } from "../services/api/queryClient";
+import { setSessionExpirationHandler } from "../services/api/sessionHandler";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { session } = useSession();
+  const { session, signOut } = useSession();
+
+  // Set up session expiration handler
+  useEffect(() => {
+    setSessionExpirationHandler(() => {
+      // Sign out from context - routing will be handled automatically by Stack.Protected guards
+      signOut();
+    });
+  }, [signOut]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

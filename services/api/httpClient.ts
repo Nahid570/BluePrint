@@ -4,7 +4,8 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
+import { handleSessionExpiration } from "./sessionHandler";
 
 // API Base URL - Update this with your actual API URL
 // You can also use environment variables: process.env.EXPO_PUBLIC_API_URL
@@ -70,23 +71,14 @@ httpClient.interceptors.response.use(
     };
 
     // Handle 401 Unauthorized - Token expired or invalid
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip session expiration handler for login endpoint (invalid credentials is not session expiration)
+    const isLoginEndpoint = originalRequest?.url?.includes("/api/investor/login");
+    
+    if (error.response?.status === 401 && !originalRequest._retry && !isLoginEndpoint) {
       originalRequest._retry = true;
 
-      try {
-        // Clear the stored token
-        if (Platform.OS === "web") {
-          localStorage.removeItem("session");
-        } else {
-          await SecureStore.deleteItemAsync("session");
-        }
-
-        // You can dispatch a logout action here or navigate to login
-        // For now, we'll just reject the error
-        // You might want to emit an event or use a global state management solution
-      } catch (storageError) {
-        console.error("Error clearing session:", storageError);
-      }
+      // Handle session expiration - show alert and trigger logout
+      await handleSessionExpiration();
 
       return Promise.reject(error);
     }
@@ -107,9 +99,11 @@ httpClient.interceptors.response.use(
     if (error.response) {
       const status = error.response.status;
       const data = error.response.data as any;
+      const isLoginEndpoint = originalRequest?.url?.includes("/api/investor/login");
 
       // Log error details in development
-      if (__DEV__) {
+      // Skip logging for login endpoint 401 errors (invalid credentials is expected, not an error)
+      if (__DEV__ && !(isLoginEndpoint && status === 401)) {
         const fullUrl = `${originalRequest?.baseURL}${originalRequest?.url}`;
         console.error(
           `[API Error] ${status} ${originalRequest?.method?.toUpperCase()} ${fullUrl}`

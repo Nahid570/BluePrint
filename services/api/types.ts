@@ -58,7 +58,7 @@ export type LoginResponse = ApiResponse<LoginResponseData>;
 export interface ChangePasswordRequest {
   current_password: string;
   new_password: string;
-  confirm_password: string;
+  new_password_confirmation: string;
 }
 
 // Profile Types
