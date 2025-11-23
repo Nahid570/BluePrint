@@ -75,25 +75,40 @@ export interface UpdateProfileRequest {
 }
 
 // Club Types
+export interface ClubCategory {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+}
+
 export interface Club {
   id: number;
   name: string;
   description: string;
-  category: {
-    id: number;
-    name: string;
-    color: string;
-  };
+  status: "active" | "inactive";
+  investment_type: string;
+  geographic_focus: string;
+  risk_level: "conservative" | "moderate" | "aggressive" | "speculative";
+  investment_horizon: string;
+  investment_horizon_label: string;
+  minimum_investment: number;
+  maximum_investment: number;
+  share_price: number;
+  shares_remaining: number;
   total_shares_available: number;
   shares_sold: number;
-  price_per_share: number;
-  risk_level: "low" | "medium" | "high";
+  current_members: number;
+  max_members: number;
+  total_investment_pool: number;
+  total_investment: number;
   expected_return: number;
-  minimum_investment: number;
-  image_url?: string;
-  created_at: string;
-  updated_at: string;
+  liquidity_terms: string;
+  liquidity_terms_label: string;
+  category: ClubCategory;
 }
+
+export type ClubsListResponse = ApiResponse<Club[]>;
 
 export interface ClubDetail extends Club {
   location: string;
