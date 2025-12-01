@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
+import { useCurrency } from "../../../hooks/useCurrency";
 import { getTransactionDetail } from "../../../services/api/transactions";
 
 const getTypeColor = (type: string) => {
@@ -42,6 +43,7 @@ const getTypeIcon = (type: string) => {
 export default function TransactionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { formatCurrency } = useCurrency();
 
   const {
     data: transactionResponse,
@@ -55,15 +57,6 @@ export default function TransactionDetailScreen() {
   });
 
   const transaction = transactionResponse?.data;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

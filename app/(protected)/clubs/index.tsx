@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
+import { useCurrency } from "../../../hooks/useCurrency";
 import { getClubs } from "../../../services/api/clubs";
 import { Club } from "../../../services/api/types";
 
@@ -40,6 +41,7 @@ const getRiskColor = (risk: string) => {
 
 export default function ClubsScreen() {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [activeFilter, setActiveFilter] = useState<
     "live" | "ongoing" | "settled"
   >("live");
@@ -53,15 +55,6 @@ export default function ClubsScreen() {
     queryKey: ["clubs", activeFilter],
     queryFn: () => getClubs({ type: activeFilter }),
   });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const clubs = clubsResponse?.data || [];
 
@@ -291,16 +284,15 @@ export default function ClubsScreen() {
                 <StatCard
                   icon="stats-chart"
                   label="Avg Return"
-                  value={`${
-                    clubs.length > 0
+                  value={`${clubs.length > 0
                       ? (
-                          clubs.reduce(
-                            (sum, club) => sum + club.expected_return,
-                            0
-                          ) / clubs.length
-                        ).toFixed(2)
+                        clubs.reduce(
+                          (sum, club) => sum + club.expected_return,
+                          0
+                        ) / clubs.length
+                      ).toFixed(2)
                       : 0
-                  }%`}
+                    }%`}
                   color="#F59E0B"
                 />
               </View>

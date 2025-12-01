@@ -11,16 +11,16 @@ export const endpoints = {
   profile: {
     get: "/api/investor/profile",
     update: "/api/investor/profile",
+    avatar: "/api/investor/profile/avatar",
   },
 
   // Clubs endpoints
   clubs: {
     list: "/api/investor/clubs",
     detail: (id: string | number) => `/api/investor/clubs/${id}`,
+    joinRequest: (id: string | number) => `/api/investor/clubs/${id}/join-request`,
     invest: (id: string | number) => `/api/investor/clubs/${id}/invest`,
   },
-
-  // Transactions endpoints
   transactions: {
     list: "/api/investor/transactions",
     detail: (id: string | number) => `/api/investor/transactions/${id}`,

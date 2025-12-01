@@ -1,3 +1,4 @@
+import { storeCurrency } from "../../utils/currency";
 import { endpoints } from "./endpoints";
 import { httpClient, setAuthToken } from "./httpClient";
 import {
@@ -19,9 +20,14 @@ export const loginInvestor = async (
       credentials
     );
 
-    // If login is successful, store the token
+    // If login is successful, store the token and currency
     if (response.data.success && response.data.data?.token) {
       await setAuthToken(response.data.data.token);
+
+      // Store currency from company data
+      if (response.data.data.company?.currency) {
+        await storeCurrency(response.data.data.company.currency);
+      }
     }
 
     return response.data;

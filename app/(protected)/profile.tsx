@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -16,11 +17,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
 import { useSession } from "../../context/AuthContext";
-import { getProfile } from "../../services/api/profile";
+import { useCurrency } from "../../hooks/useCurrency";
+import { getProfile, updateAvatar } from "../../services/api/profile";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useSession();
+  const queryClient = useQueryClient();
+  const { formatCurrency } = useCurrency();
 
   // Fetch profile data
   const {
@@ -32,6 +36,50 @@ export default function ProfileScreen() {
     queryKey: ["profile"],
     queryFn: getProfile,
   });
+
+  // Avatar update mutation
+  const updateAvatarMutation = useMutation({
+    mutationFn: updateAvatar,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["profile"], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          data: {
+            ...oldData.data,
+            avatar: data?.data?.avatar,
+          },
+        };
+      });
+      Alert.alert("Success", "Avatar updated successfully");
+    },
+    onError: (error: any) => {
+      Alert.alert("Error", error.message || "Failed to update avatar");
+    },
+  });
+
+  const handleAvatarUpdate = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/jpeg", "image/png", "image/webp"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) return;
+
+      const file = result.assets[0];
+
+      // Check file size (10MB limit)
+      if (file.size && file.size > 10 * 1024 * 1024) {
+        Alert.alert("Error", "Image size must be less than 10MB");
+        return;
+      }
+
+      updateAvatarMutation.mutate(file);
+    } catch (err) {
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -45,15 +93,6 @@ export default function ProfileScreen() {
         style: "destructive",
       },
     ]);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
   };
 
   // Loading state
@@ -121,11 +160,15 @@ export default function ProfileScreen() {
       >
         {/* Header Section */}
         <View style={styles.header}>
-          <View style={styles.avatarContainer}>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={handleAvatarUpdate}
+            disabled={updateAvatarMutation.isPending}
+          >
             {profileData.avatar ? (
               <Image
                 source={{ uri: profileData.avatar }}
-                style={styles.avatar}
+                style={[styles.avatar, updateAvatarMutation.isPending && { opacity: 0.5 }]}
               />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
@@ -134,6 +177,19 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             )}
+
+            {updateAvatarMutation.isPending && (
+              <View style={styles.avatarLoadingOverlay}>
+                <ActivityIndicator size="small" color="#2563EB" />
+              </View>
+            )}
+
+            {!updateAvatarMutation.isPending && (
+              <View style={styles.editAvatarBadge}>
+                <Ionicons name="camera" size={scale(14)} color="#FFFFFF" />
+              </View>
+            )}
+
             <View style={styles.statusBadge}>
               <View
                 style={[
@@ -145,7 +201,7 @@ export default function ProfileScreen() {
                 ]}
               />
             </View>
-          </View>
+          </TouchableOpacity>
           <Text style={styles.name}>{profileData.name}</Text>
           <View style={styles.idBadge}>
             <Text style={styles.idText}>ID: {profileData.investor_id}</Text>
@@ -197,9 +253,9 @@ export default function ProfileScreen() {
                 profileData.address && profileData.city && profileData.country
                   ? `${profileData.address}, ${profileData.city}, ${profileData.country}`
                   : profileData.address ||
-                    profileData.city ||
-                    profileData.country ||
-                    null
+                  profileData.city ||
+                  profileData.country ||
+                  null
               }
             />
           </View>
@@ -223,7 +279,7 @@ export default function ProfileScreen() {
               value={
                 profileData.gender
                   ? profileData.gender.charAt(0).toUpperCase() +
-                    profileData.gender.slice(1)
+                  profileData.gender.slice(1)
                   : null
               }
             />
@@ -234,7 +290,7 @@ export default function ProfileScreen() {
               value={
                 profileData.marital_status
                   ? profileData.marital_status.charAt(0).toUpperCase() +
-                    profileData.marital_status.slice(1)
+                  profileData.marital_status.slice(1)
                   : null
               }
             />
@@ -527,5 +583,29 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#3B82F6",
     fontFamily: "Outfit_700Bold",
+  },
+  avatarLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: scale(50),
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editAvatarBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
+    backgroundColor: "#2563EB",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
 });

@@ -1,20 +1,33 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
   Linking,
+  Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
-import { getClubDetail } from "../../../services/api/clubs";
+import { useCurrency } from "../../../hooks/useCurrency";
+import { getClubDetail, investInClub, joinClubRequest } from "../../../services/api/clubs";
 
 const getCategoryColor = (color: string) => {
   const colors: any = {
@@ -41,6 +54,34 @@ const getRiskColor = (risk: string) => {
 export default function ClubDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const scaleAnim = useSharedValue(1);
+  const { formatCurrency } = useCurrency();
+
+  // Modal State
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [quantity, setQuantity] = useState(0);
+  const [notes, setNotes] = useState("");
+  const [minQuantity, setMinQuantity] = useState(0);
+  const [maxQuantity, setMaxQuantity] = useState(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    scaleAnim.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1000 }),
+        withTiming(1, { duration: 1000 })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedFabStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scaleAnim.value }],
+    };
+  });
 
   const {
     data: clubResponse,
@@ -55,13 +96,78 @@ export default function ClubDetailScreen() {
 
   const club = clubResponse?.data;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  // Initialize quantity when club data loads
+  useEffect(() => {
+    if (club) {
+      const minQty = Math.ceil(club.minimum_investment / club.share_price);
+      const maxQty = Math.floor(club.maximum_investment / club.share_price);
+      setMinQuantity(minQty);
+      setMaxQuantity(maxQty);
+      setQuantity(minQty);
+    }
+  }, [club]);
+
+  // Join Request Mutation
+  const joinMutation = useMutation({
+    mutationFn: (data: {
+      invest_quantity: number;
+      investment_amount: number;
+      notes: string;
+    }) => joinClubRequest(id!, data),
+    onSuccess: () => {
+      setSubmitError(null);
+      setShowJoinModal(false);
+      Alert.alert(
+        "Success",
+        "Your request to join the club has been submitted successfully."
+      );
+      setNotes("");
+      setQuantity(minQuantity);
+    },
+    onError: (error: any) => {
+      setSubmitError(error.message || "Failed to submit request");
+    },
+  });
+
+  // Invest Mutation
+  const investMutation = useMutation({
+    mutationFn: (data: {
+      invest_quantity: number;
+      investment_amount: number;
+    }) => investInClub(id!, data),
+    onSuccess: (response) => {
+      setSubmitError(null);
+      setSubmitSuccess(response.message || "Investment processed successfully.");
+      setQuantity(minQuantity);
+      refetch(); // Refresh club data to show updated stats
+    },
+    onError: (error: any) => {
+      setSubmitSuccess(null);
+      setSubmitError(error.message || "Failed to process investment");
+    },
+  });
+
+  const handleSubmit = () => {
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    if (club?.club_type === "live") {
+      if (!notes.trim()) {
+        setSubmitError("Please add a note to your request");
+        return;
+      }
+
+      joinMutation.mutate({
+        invest_quantity: quantity,
+        investment_amount: quantity * (club?.share_price || 0),
+        notes: notes,
+      });
+    } else if (club?.club_type === "ongoing") {
+      investMutation.mutate({
+        invest_quantity: quantity,
+        investment_amount: quantity * (club?.share_price || 0),
+      });
+    }
   };
 
   const InfoRow = ({
@@ -467,8 +573,150 @@ export default function ClubDetailScreen() {
           </View>
         )}
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* FAB Join/Invest Button */}
+      {((!club.is_member && club.club_type === "live") || club.club_type === "ongoing") && (
+        <Animated.View style={[styles.fabContainer, animatedFabStyle]}>
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={() => setShowJoinModal(true)}
+          >
+            <Ionicons name="add" size={scale(24)} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* Join/Invest Modal */}
+      <Modal
+        visible={showJoinModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowJoinModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {club.club_type === "live" ? "Join Club Request" : "Invest in Club"}
+              </Text>
+              <TouchableOpacity onPress={() => setShowJoinModal(false)}>
+                <Ionicons name="close" size={scale(24)} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalBody}>
+                <Text style={styles.modalSubtitle}>Investment Amount</Text>
+
+                <View style={styles.quantityContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.quantityButton,
+                      quantity <= minQuantity && styles.quantityButtonDisabled,
+                    ]}
+                    onPress={() => quantity > minQuantity && setQuantity(q => q - 1)}
+                    disabled={quantity <= minQuantity}
+                  >
+                    <Ionicons name="remove" size={scale(20)} color={quantity <= minQuantity ? "#CBD5E1" : "#1E293B"} />
+                  </TouchableOpacity>
+
+                  <View style={styles.quantityValueContainer}>
+                    <Text style={styles.quantityValue}>{quantity}</Text>
+                    <Text style={styles.quantityLabel}>Shares</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.quantityButton,
+                      quantity >= maxQuantity && styles.quantityButtonDisabled,
+                    ]}
+                    onPress={() => quantity < maxQuantity && setQuantity(q => q + 1)}
+                    disabled={quantity >= maxQuantity}
+                  >
+                    <Ionicons name="add" size={scale(20)} color={quantity >= maxQuantity ? "#CBD5E1" : "#1E293B"} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.amountSummary}>
+                  <Text style={styles.amountLabel}>Total Investment</Text>
+                  <Text style={styles.amountValue}>
+                    {formatCurrency(quantity * club.share_price)}
+                  </Text>
+                </View>
+
+                <View style={styles.maxInvestmentContainer}>
+                  <Text style={styles.maxInvestmentText}>
+                    Maximum Investment: {formatCurrency(club.maximum_investment)}
+                  </Text>
+                </View>
+
+                {club.club_type === "live" && (
+                  <>
+                    <Text style={styles.modalSubtitle}>Notes</Text>
+                    <TextInput
+                      style={styles.notesInput}
+                      placeholder="Why do you want to join this club?"
+                      placeholderTextColor="#94A3B8"
+                      multiline
+                      numberOfLines={4}
+                      value={notes}
+                      onChangeText={(text) => {
+                        setNotes(text);
+                        setSubmitError(null);
+                      }}
+                      textAlignVertical="top"
+                    />
+                  </>
+                )}
+
+                {submitSuccess && (
+                  <View style={styles.successBanner}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={scale(20)}
+                      color="#10B981"
+                    />
+                    <Text style={styles.successBannerText}>{submitSuccess}</Text>
+                  </View>
+                )}
+
+                {submitError && (
+                  <View style={styles.errorBanner}>
+                    <Ionicons
+                      name="alert-circle"
+                      size={scale(20)}
+                      color="#EF4444"
+                    />
+                    <Text style={styles.errorBannerText}>{submitError}</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    (joinMutation.isPending || investMutation.isPending) && styles.submitButtonDisabled,
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={joinMutation.isPending || investMutation.isPending}
+                >
+                  {joinMutation.isPending || investMutation.isPending ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>
+                      {club.club_type === "live" ? "Submit Request" : "Invest Now"}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -731,5 +979,182 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     fontWeight: "600",
     fontFamily: "Outfit_500Medium",
+  },
+  fabContainer: {
+    position: "absolute",
+    bottom: verticalScale(30),
+    right: scale(20),
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fab: {
+    width: scale(56),
+    height: scale(56),
+    borderRadius: scale(28),
+    backgroundColor: "#2563EB",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+    padding: moderateScale(20),
+    maxHeight: "90%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: verticalScale(20),
+  },
+  modalTitle: {
+    fontSize: moderateScale(20),
+    fontFamily: "Outfit_700Bold",
+    color: "#1E293B",
+  },
+  modalBody: {
+    paddingBottom: verticalScale(20),
+  },
+  modalSubtitle: {
+    fontSize: moderateScale(16),
+    fontFamily: "Outfit_600SemiBold",
+    color: "#1E293B",
+    marginBottom: verticalScale(12),
+  },
+  quantityContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F8FAFC",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    marginBottom: verticalScale(16),
+  },
+  quantityButton: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quantityButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: "#F1F5F9",
+  },
+  quantityValueContainer: {
+    alignItems: "center",
+  },
+  quantityValue: {
+    fontSize: moderateScale(24),
+    fontFamily: "Outfit_700Bold",
+    color: "#1E293B",
+  },
+  quantityLabel: {
+    fontSize: moderateScale(12),
+    fontFamily: "Outfit_400Regular",
+    color: "#64748B",
+  },
+  amountSummary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    padding: moderateScale(16),
+    borderRadius: moderateScale(12),
+    marginBottom: verticalScale(24),
+  },
+  amountLabel: {
+    fontSize: moderateScale(14),
+    fontFamily: "Outfit_500Medium",
+    color: "#1E40AF",
+  },
+  amountValue: {
+    fontSize: moderateScale(18),
+    fontFamily: "Outfit_700Bold",
+    color: "#1E40AF",
+  },
+  maxInvestmentContainer: {
+    alignItems: "center",
+    marginBottom: verticalScale(16),
+  },
+  maxInvestmentText: {
+    fontSize: moderateScale(12),
+    fontFamily: "Outfit_400Regular",
+    color: "#64748B",
+  },
+  notesInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    height: verticalScale(120),
+    fontSize: moderateScale(16),
+    fontFamily: "Outfit_400Regular",
+    color: "#1E293B",
+    marginBottom: verticalScale(24),
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF2F2",
+    padding: moderateScale(12),
+    borderRadius: moderateScale(8),
+    marginBottom: verticalScale(16),
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  errorBannerText: {
+    marginLeft: scale(8),
+    color: "#EF4444",
+    fontSize: moderateScale(14),
+    fontFamily: "Outfit_500Medium",
+    flex: 1,
+  },
+  successBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ECFDF5",
+    padding: moderateScale(12),
+    borderRadius: moderateScale(8),
+    marginBottom: verticalScale(16),
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+  successBannerText: {
+    marginLeft: scale(8),
+    color: "#10B981",
+    fontSize: moderateScale(14),
+    fontFamily: "Outfit_500Medium",
+    flex: 1,
+  },
+  submitButton: {
+    backgroundColor: "#2563EB",
+    paddingVertical: verticalScale(16),
+    borderRadius: moderateScale(12),
+    alignItems: "center",
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    color: "#FFFFFF",
+    fontSize: moderateScale(16),
+    fontFamily: "Outfit_600SemiBold",
   },
 });

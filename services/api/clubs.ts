@@ -2,9 +2,8 @@ import { endpoints } from "./endpoints";
 import { httpClient } from "./httpClient";
 import {
   ApiResponse,
-  ClubsListResponse,
-  Club,
   ClubDetailResponse,
+  ClubsListResponse
 } from "./types";
 
 /**
@@ -123,6 +122,89 @@ export const getClubDetail = async (
         success: false,
         code: error.response.status || 500,
         message: "An unexpected error occurred",
+      };
+    } else if (error.request) {
+      throw {
+        success: false,
+        code: 0,
+        message: "Network error. Please check your connection.",
+      };
+    } else {
+      throw {
+        success: false,
+        code: 500,
+        message: error.message || "An unexpected error occurred",
+      };
+    }
+  }
+};
+
+/**
+ * Request to join a club
+ */
+export const joinClubRequest = async (
+  id: string | number,
+  data: {
+    invest_quantity: number;
+    investment_amount: number;
+    notes: string;
+  }
+): Promise<ApiResponse<any>> => {
+  try {
+    const response = await httpClient.post<ApiResponse<any>>(
+      endpoints.clubs.joinRequest(id),
+      data
+    );
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      const errorData = error.response.data;
+      throw {
+        success: false,
+        code: errorData.code || error.response.status,
+        message: errorData.message || "Failed to submit join request",
+        errors: errorData.errors,
+      };
+    } else if (error.request) {
+      throw {
+        success: false,
+        code: 0,
+        message: "Network error. Please check your connection.",
+      };
+    } else {
+      throw {
+        success: false,
+        code: 500,
+        message: error.message || "An unexpected error occurred",
+      };
+    }
+  }
+};
+
+/**
+ * Invest in a club
+ */
+export const investInClub = async (
+  id: string | number,
+  data: {
+    invest_quantity: number;
+    investment_amount: number;
+  }
+): Promise<ApiResponse<any>> => {
+  try {
+    const response = await httpClient.post<ApiResponse<any>>(
+      endpoints.clubs.invest(id),
+      data
+    );
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      const errorData = error.response.data;
+      throw {
+        success: false,
+        code: errorData.code || error.response.status,
+        message: errorData.message || "Failed to process investment",
+        errors: errorData.errors,
       };
     } else if (error.request) {
       throw {

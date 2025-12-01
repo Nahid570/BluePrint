@@ -17,6 +17,7 @@ import {
 import { BarChart, LineChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
+import { useCurrency } from "../../hooks/useCurrency";
 import { getDashboard } from "../../services/api/dashboard";
 import { getProfile } from "../../services/api/profile";
 import { getReport } from "../../services/api/report";
@@ -47,6 +48,7 @@ const getInitial = (name: string): string => {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
 
   // Fetch dashboard data
   const {
@@ -81,16 +83,42 @@ export default function DashboardScreen() {
     queryFn: getProfile,
   });
 
+  const dashboard = dashboardResponse?.data;
+  const report = reportResponse?.data;
+  const profile = profileResponse?.data;
+
+  // Calculate balance percentage change
+  const balanceData = useMemo(() => {
+    if (!dashboard?.balance_trend_graph || dashboard.balance_trend_graph.length === 0) {
+      return {
+        balance_trend_graph: [],
+        balance_percentage_change: 0,
+      };
+    }
+
+    const balanceTrend = dashboard.balance_trend_graph;
+    const firstBalance = balanceTrend[0].balance;
+    const lastBalance = balanceTrend[balanceTrend.length - 1].balance;
+
+    let balancePercentageChange = 0;
+    if (firstBalance !== 0) {
+      balancePercentageChange = ((lastBalance - firstBalance) / firstBalance) * 100;
+    }
+
+    return {
+      balance_trend_graph: balanceTrend,
+      balance_percentage_change: balancePercentageChange,
+    };
+  }, [dashboard]);
+
   // Transform API data to match UI structure
   const dashboardData = useMemo(() => {
-    if (!dashboardResponse?.data) {
+    if (!dashboard) {
       return null;
     }
 
-    const apiData = dashboardResponse.data;
-
     // Transform money flow graph
-    const moneyFlowGraph = apiData.money_flow_graph
+    const moneyFlowGraph = dashboard.money_flow_graph
       .filter((item) => item.inflow > 0 || item.outflow > 0) // Only show months with data
       .flatMap((item) => [
         {
@@ -102,23 +130,23 @@ export default function DashboardScreen() {
       ]);
 
     // Transform profit trend graph
-    const profitTrendGraph = apiData.profit_trend_graph
+    const profitTrendGraph = dashboard.profit_trend_graph
       .filter((item) => item.profit > 0) // Only show months with profit
       .map((item) => ({
         value: item.profit,
         label: formatMonthLabel(item.month),
-      }));
+      }))
 
     // Get top 3 transactions for summary
-    const transactions = apiData.transaction_type_distribution
-      .filter((t) => ["deposit", "withdrawal", "profit"].includes(t.type))
-      .map((t) => ({
+    const transactions = dashboard.transaction_type_distribution
+      .filter((t: any) => ["deposit", "withdrawal", "profit"].includes(t.type))
+      .map((t: any) => ({
         type: t.type,
         label: t.label,
         amount: t.total_amount,
         count: t.count,
       }))
-      .sort((a, b) => b.amount - a.amount)
+      .sort((a: any, b: any) => b.amount - a.amount)
       .slice(0, 3);
 
     // Calculate dynamic max values for charts
@@ -133,9 +161,9 @@ export default function DashboardScreen() {
         : 500000;
 
     // Calculate balance percentage change from balance trend
-    const balanceTrend = apiData.balance_trend_graph
-      .filter((item) => item.balance > 0)
-      .sort((a, b) => a.month.localeCompare(b.month));
+    const balanceTrend = dashboard.balance_trend_graph
+      .filter((item: any) => item.balance > 0)
+      .sort((a: any, b: any) => a.month.localeCompare(b.month));
 
     let balancePercentageChange = 0;
     if (balanceTrend.length >= 2) {
@@ -148,10 +176,10 @@ export default function DashboardScreen() {
     }
 
     return {
-      available_balance: apiData.available_balance,
-      available_share_quantity: apiData.available_share_quantity,
-      available_share_amount: apiData.available_share_amount,
-      ongoing_clubs_count: apiData.ongoing_clubs_count,
+      available_balance: dashboard.available_balance,
+      available_share_quantity: dashboard.available_share_quantity,
+      available_share_amount: dashboard.available_share_amount,
+      ongoing_clubs_count: dashboard.ongoing_clubs_count,
       money_flow_graph: moneyFlowGraph,
       profit_trend_graph: profitTrendGraph,
       money_flow_max_value: moneyFlowMaxValue,
@@ -160,15 +188,6 @@ export default function DashboardScreen() {
       balance_percentage_change: balancePercentageChange,
     };
   }, [dashboardResponse]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   // Loading state
   const isLoading = isLoadingDashboard || isLoadingReport || isLoadingProfile;
@@ -472,8 +491,8 @@ export default function DashboardScreen() {
                         item.type === "deposit"
                           ? "#ECFDF5"
                           : item.type === "withdrawal"
-                          ? "#FEF2F2"
-                          : "#EFF6FF",
+                            ? "#FEF2F2"
+                            : "#EFF6FF",
                     },
                   ]}
                 >
@@ -482,16 +501,16 @@ export default function DashboardScreen() {
                       item.type === "deposit"
                         ? "arrow-down"
                         : item.type === "withdrawal"
-                        ? "arrow-up"
-                        : "trending-up"
+                          ? "arrow-up"
+                          : "trending-up"
                     }
                     size={scale(18)}
                     color={
                       item.type === "deposit"
                         ? "#10B981"
                         : item.type === "withdrawal"
-                        ? "#EF4444"
-                        : "#3B82F6"
+                          ? "#EF4444"
+                          : "#3B82F6"
                     }
                   />
                 </View>

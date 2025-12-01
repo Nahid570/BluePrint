@@ -141,3 +141,52 @@ export const updateProfile = async (
   }
 };
 
+/**
+ * Update investor avatar
+ */
+export const updateAvatar = async (
+  file: any
+): Promise<ApiResponse<User>> => {
+  try {
+    const formData = new FormData();
+    formData.append("avatar", {
+      uri: file.uri,
+      name: file.name || "avatar.jpg",
+      type: file.mimeType || "image/jpeg",
+    } as any);
+
+    const response = await httpClient.post<ApiResponse<User>>(
+      endpoints.profile.avatar,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      const errorData = error.response.data;
+      throw {
+        success: false,
+        code: errorData.code || error.response.status,
+        message: errorData.message || "Failed to update avatar",
+        errors: errorData.errors,
+      };
+    } else if (error.request) {
+      throw {
+        success: false,
+        code: 0,
+        message: "Network error. Please check your connection.",
+      };
+    } else {
+      throw {
+        success: false,
+        code: 500,
+        message: error.message || "An unexpected error occurred",
+      };
+    }
+  }
+};
+

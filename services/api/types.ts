@@ -45,6 +45,7 @@ export interface Company {
   logo?: string;
   domain?: string;
   status: "active" | "inactive";
+  currency?: string;
 }
 
 export interface LoginResponseData {

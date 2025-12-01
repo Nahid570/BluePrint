@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
+import { useCurrency } from "../../../hooks/useCurrency";
 import { getTransactions } from "../../../services/api/transactions";
 
 const getTypeColor = (type: string) => {
@@ -44,6 +45,7 @@ const getTypeIcon = (type: string) => {
 
 export default function TransactionsScreen() {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -85,15 +87,6 @@ export default function TransactionsScreen() {
   // Get total count from all transactions response (unfiltered)
   const allTransactionsTotal =
     allCategoriesResponse?.data?.transactions?.total || pagination?.total || 0;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "BDT",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
