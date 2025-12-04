@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import { clearAuthToken } from "./httpClient";
 
 // Global handler for session expiration
@@ -15,28 +14,15 @@ export const setSessionExpirationHandler = (handler: () => void) => {
 
 /**
  * Handle session expiration
- * Shows an alert and triggers the handler to logout and navigate
+ * Automatically signs out the user without showing any alert
  */
 export const handleSessionExpiration = async () => {
   // Clear the token from storage
   await clearAuthToken();
 
-  // Show alert to user
-  Alert.alert(
-    "Session Expired",
-    "Your session has expired. Please login again to continue.",
-    [
-      {
-        text: "OK",
-        onPress: () => {
-          // Call the handler to logout and navigate to login
-          if (sessionExpirationHandler) {
-            sessionExpirationHandler();
-          }
-        },
-      },
-    ],
-    { cancelable: false }
-  );
+  // Call the handler to logout and navigate to login
+  if (sessionExpirationHandler) {
+    sessionExpirationHandler();
+  }
 };
 

@@ -5,10 +5,10 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
+  Dimensions,
+  Keyboard,
   Linking,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,6 +18,7 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  useAnimatedKeyboard,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -51,6 +52,8 @@ const getRiskColor = (risk: string) => {
   return colors[risk] || "#64748B";
 };
 
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
 export default function ClubDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -65,6 +68,17 @@ export default function ClubDetailScreen() {
   const [maxQuantity, setMaxQuantity] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [activeDocTab, setActiveDocTab] = useState<"public" | "member" | "personal">("public");
+  const [activeInfoTab, setActiveInfoTab] = useState<"members" | "expenses" | "activities">("members");
+
+  // Keyboard animation for modal
+  const keyboard = useAnimatedKeyboard();
+  
+  const animatedModalStyle = useAnimatedStyle(() => {
+    return {
+      paddingBottom: keyboard.height.value,
+    };
+  });
 
   useEffect(() => {
     scaleAnim.value = withRepeat(
@@ -192,6 +206,81 @@ export default function ClubDetailScreen() {
         <Text style={styles.infoLabel}>{label}</Text>
       </View>
       <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+
+  const renderDocumentItem = (doc: any) => (
+    <View key={doc.id}>
+      <TouchableOpacity
+        style={styles.documentItem}
+        onPress={() => Linking.openURL(doc.file_url)}
+      >
+        <View style={styles.documentLeft}>
+          <Ionicons
+            name="document-text"
+            size={scale(20)}
+            color="#3B82F6"
+          />
+          <View style={styles.documentInfo}>
+            <Text style={styles.documentTitle}>{doc.title}</Text>
+            <Text style={styles.documentType}>
+              {doc.document_type.replace("_", " ")}
+            </Text>
+          </View>
+        </View>
+        <Ionicons
+          name="download-outline"
+          size={scale(20)}
+          color="#94A3B8"
+        />
+      </TouchableOpacity>
+      <View style={styles.divider} />
+    </View>
+  );
+
+  const renderMemberItem = (member: any) => (
+    <View key={member.investor_id}>
+      <View style={styles.memberItem}>
+        <View style={styles.memberAvatar}>
+          {member.avatar ? (
+            <Animated.Image
+              source={{ uri: member.avatar }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {member.name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.memberInfo}>
+          <Text style={styles.memberName}>{member.name}</Text>
+          <Text style={styles.memberEmail}>{member.email}</Text>
+        </View>
+      </View>
+      <View style={styles.divider} />
+    </View>
+  );
+
+  const renderExpenseItem = (expense: any, index: number) => (
+    <View key={index}>
+      <View style={styles.expenseItem}>
+        <View style={styles.expenseLeft}>
+          <View style={styles.expenseIcon}>
+            <Ionicons name="receipt-outline" size={scale(20)} color="#64748B" />
+          </View>
+          <View style={styles.expenseInfo}>
+            <Text style={styles.expenseDescription}>{expense.description}</Text>
+            <Text style={styles.expenseDate}>{expense.expense_date}</Text>
+          </View>
+        </View>
+        <Text style={styles.expenseAmount}>
+          {formatCurrency(expense.amount)}
+        </Text>
+      </View>
+      <View style={styles.divider} />
     </View>
   );
 
@@ -354,6 +443,41 @@ export default function ClubDetailScreen() {
           </View>
         </View>
 
+        {/* User Investment Info */}
+        {club.user_investment_info && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>My Investment</Text>
+            <View style={styles.card}>
+              <View style={styles.metricsGrid}>
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricLabel}>Shares Owned</Text>
+                  <Text style={styles.metricValue}>
+                    {club.user_investment_info.share_qty}
+                  </Text>
+                </View>
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricLabel}>Total Investment</Text>
+                  <Text style={[styles.metricValue, { color: "#2563EB" }]}>
+                    {formatCurrency(club.user_investment_info.investment_amount)}
+                  </Text>
+                </View>
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricLabel}>Purchase Price</Text>
+                  <Text style={styles.metricValue}>
+                    {formatCurrency(club.user_investment_info.share_price)}
+                  </Text>
+                </View>
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricLabel}>Joined Date</Text>
+                  <Text style={styles.metricValue} numberOfLines={1}>
+                    {new Date(club.user_investment_info.joined_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Key Metrics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Key Metrics</Text>
@@ -508,69 +632,256 @@ export default function ClubDetailScreen() {
         </View>
 
         {/* Documents */}
-        {club.public_documents.length > 0 && (
+
+        {club.club_type === "ongoing" ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Documents</Text>
             <View style={styles.card}>
-              {club.public_documents.map((doc, index) => (
-                <View key={doc.id}>
-                  {index > 0 && <View style={styles.divider} />}
-                  <TouchableOpacity
-                    style={styles.documentItem}
-                    onPress={() => Linking.openURL(doc.file_url)}
+              {/* Tabs */}
+              <View style={styles.tabContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabButton,
+                    activeDocTab === "public" && styles.activeTabButton,
+                  ]}
+                  onPress={() => setActiveDocTab("public")}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeDocTab === "public" && styles.activeTabText,
+                    ]}
                   >
-                    <View style={styles.documentLeft}>
+                    Public
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.tabButton,
+                    activeDocTab === "member" && styles.activeTabButton,
+                  ]}
+                  onPress={() => setActiveDocTab("member")}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeDocTab === "member" && styles.activeTabText,
+                    ]}
+                  >
+                    Member
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.tabButton,
+                    activeDocTab === "personal" && styles.activeTabButton,
+                  ]}
+                  onPress={() => setActiveDocTab("personal")}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeDocTab === "personal" && styles.activeTabText,
+                    ]}
+                  >
+                    Personal
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Document List */}
+              <View style={{ marginTop: verticalScale(16) }}>
+                {activeDocTab === "public" &&
+                  (club.public_documents?.length > 0 ? (
+                    club.public_documents.map((doc) => renderDocumentItem(doc))
+                  ) : (
+                    <Text style={styles.emptyText}>No public documents available</Text>
+                  ))}
+
+                {activeDocTab === "member" &&
+                  (club.member_documents?.length > 0 ? (
+                    club.member_documents.map((doc) => renderDocumentItem(doc))
+                  ) : (
+                    <Text style={styles.emptyText}>No member documents available</Text>
+                  ))}
+
+                {activeDocTab === "personal" &&
+                  (club.user_personal_documents?.length > 0 ? (
+                    club.user_personal_documents.map((doc) => renderDocumentItem(doc))
+                  ) : (
+                    <Text style={styles.emptyText}>No personal documents available</Text>
+                  ))}
+              </View>
+            </View>
+          </View>
+        ) : (
+          club.public_documents.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Documents</Text>
+              <View style={styles.card}>
+                {club.public_documents.map((doc, index) => (
+                  <View key={doc.id}>
+                    {index > 0 && <View style={styles.divider} />}
+                    <TouchableOpacity
+                      style={styles.documentItem}
+                      onPress={() => Linking.openURL(doc.file_url)}
+                    >
+                      <View style={styles.documentLeft}>
+                        <Ionicons
+                          name="document-text"
+                          size={scale(20)}
+                          color="#3B82F6"
+                        />
+                        <View style={styles.documentInfo}>
+                          <Text style={styles.documentTitle}>{doc.title}</Text>
+                          <Text style={styles.documentType}>
+                            {doc.document_type.replace("_", " ")}
+                          </Text>
+                        </View>
+                      </View>
                       <Ionicons
-                        name="document-text"
+                        name="download-outline"
                         size={scale(20)}
-                        color="#3B82F6"
+                        color="#94A3B8"
                       />
-                      <View style={styles.documentInfo}>
-                        <Text style={styles.documentTitle}>{doc.title}</Text>
-                        <Text style={styles.documentType}>
-                          {doc.document_type.replace("_", " ")}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )
+        )}
+
+        {/* Activity Log / Info Tabs */}
+        {club.club_type === "ongoing" ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Club Information</Text>
+            <View style={styles.card}>
+              {/* Tabs */}
+              <View style={styles.tabContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.tabButton,
+                    activeInfoTab === "members" && styles.activeTabButton,
+                  ]}
+                  onPress={() => setActiveInfoTab("members")}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeInfoTab === "members" && styles.activeTabText,
+                    ]}
+                  >
+                    Members
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.tabButton,
+                    activeInfoTab === "expenses" && styles.activeTabButton,
+                  ]}
+                  onPress={() => setActiveInfoTab("expenses")}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeInfoTab === "expenses" && styles.activeTabText,
+                    ]}
+                  >
+                    Expenses
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.tabButton,
+                    activeInfoTab === "activities" && styles.activeTabButton,
+                  ]}
+                  onPress={() => setActiveInfoTab("activities")}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeInfoTab === "activities" && styles.activeTabText,
+                    ]}
+                  >
+                    Activities
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Content List */}
+              <View style={{ marginTop: verticalScale(16) }}>
+                {activeInfoTab === "members" &&
+                  (club.members?.length > 0 ? (
+                    club.members.map((member) => renderMemberItem(member))
+                  ) : (
+                    <Text style={styles.emptyText}>No members found</Text>
+                  ))}
+
+                {activeInfoTab === "expenses" &&
+                  (club.expenses?.length > 0 ? (
+                    club.expenses.map((expense, index) => renderExpenseItem(expense, index))
+                  ) : (
+                    <Text style={styles.emptyText}>No expenses recorded</Text>
+                  ))}
+
+                {activeInfoTab === "activities" &&
+                  (club.activities?.length > 0 ? (
+                    club.activities.map((activity, index) => (
+                      <View key={index}>
+                        {index > 0 && <View style={styles.divider} />}
+                        <View style={styles.activityItem}>
+                          <Ionicons
+                            name="time-outline"
+                            size={scale(16)}
+                            color="#94A3B8"
+                          />
+                          <View style={styles.activityInfo}>
+                            <Text style={styles.activityDescription}>
+                              {activity.description}
+                            </Text>
+                            <Text style={styles.activityMeta}>
+                              {activity.causer_name} • {activity.created_at_human}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.emptyText}>No recent activity</Text>
+                  ))}
+              </View>
+            </View>
+          </View>
+        ) : (
+          club.activities &&
+          club.activities.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recent Activity</Text>
+              <View style={styles.card}>
+                {club.activities.map((activity, index) => (
+                  <View key={index}>
+                    {index > 0 && <View style={styles.divider} />}
+                    <View style={styles.activityItem}>
+                      <Ionicons
+                        name="time-outline"
+                        size={scale(16)}
+                        color="#94A3B8"
+                      />
+                      <View style={styles.activityInfo}>
+                        <Text style={styles.activityDescription}>
+                          {activity.description}
+                        </Text>
+                        <Text style={styles.activityMeta}>
+                          {activity.causer_name} • {activity.created_at_human}
                         </Text>
                       </View>
                     </View>
-                    <Ionicons
-                      name="download-outline"
-                      size={scale(20)}
-                      color="#94A3B8"
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Activity Log */}
-        {club.activities && club.activities.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <View style={styles.card}>
-              {club.activities.map((activity, index) => (
-                <View key={index}>
-                  {index > 0 && <View style={styles.divider} />}
-                  <View style={styles.activityItem}>
-                    <Ionicons
-                      name="time-outline"
-                      size={scale(16)}
-                      color="#94A3B8"
-                    />
-                    <View style={styles.activityInfo}>
-                      <Text style={styles.activityDescription}>
-                        {activity.description}
-                      </Text>
-                      <Text style={styles.activityMeta}>
-                        {activity.causer_name} • {activity.created_at_human}
-                      </Text>
-                    </View>
                   </View>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
+          )
         )}
 
         <View style={{ height: 100 }} />
@@ -591,131 +902,147 @@ export default function ClubDetailScreen() {
       {/* Join/Invest Modal */}
       <Modal
         visible={showJoinModal}
-        transparent
+        transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowJoinModal(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setShowJoinModal(false);
+        }}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalContainer}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {club.club_type === "live" ? "Join Club Request" : "Invest in Club"}
-              </Text>
-              <TouchableOpacity onPress={() => setShowJoinModal(false)}>
-                <Ionicons name="close" size={scale(24)} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalBody}>
-                <Text style={styles.modalSubtitle}>Investment Amount</Text>
-
-                <View style={styles.quantityContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.quantityButton,
-                      quantity <= minQuantity && styles.quantityButtonDisabled,
-                    ]}
-                    onPress={() => quantity > minQuantity && setQuantity(q => q - 1)}
-                    disabled={quantity <= minQuantity}
-                  >
-                    <Ionicons name="remove" size={scale(20)} color={quantity <= minQuantity ? "#CBD5E1" : "#1E293B"} />
-                  </TouchableOpacity>
-
-                  <View style={styles.quantityValueContainer}>
-                    <Text style={styles.quantityValue}>{quantity}</Text>
-                    <Text style={styles.quantityLabel}>Shares</Text>
-                  </View>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.quantityButton,
-                      quantity >= maxQuantity && styles.quantityButtonDisabled,
-                    ]}
-                    onPress={() => quantity < maxQuantity && setQuantity(q => q + 1)}
-                    disabled={quantity >= maxQuantity}
-                  >
-                    <Ionicons name="add" size={scale(20)} color={quantity >= maxQuantity ? "#CBD5E1" : "#1E293B"} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.amountSummary}>
-                  <Text style={styles.amountLabel}>Total Investment</Text>
-                  <Text style={styles.amountValue}>
-                    {formatCurrency(quantity * club.share_price)}
-                  </Text>
-                </View>
-
-                <View style={styles.maxInvestmentContainer}>
-                  <Text style={styles.maxInvestmentText}>
-                    Maximum Investment: {formatCurrency(club.maximum_investment)}
-                  </Text>
-                </View>
-
-                {club.club_type === "live" && (
-                  <>
-                    <Text style={styles.modalSubtitle}>Notes</Text>
-                    <TextInput
-                      style={styles.notesInput}
-                      placeholder="Why do you want to join this club?"
-                      placeholderTextColor="#94A3B8"
-                      multiline
-                      numberOfLines={4}
-                      value={notes}
-                      onChangeText={(text) => {
-                        setNotes(text);
-                        setSubmitError(null);
-                      }}
-                      textAlignVertical="top"
-                    />
-                  </>
-                )}
-
-                {submitSuccess && (
-                  <View style={styles.successBanner}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={scale(20)}
-                      color="#10B981"
-                    />
-                    <Text style={styles.successBannerText}>{submitSuccess}</Text>
-                  </View>
-                )}
-
-                {submitError && (
-                  <View style={styles.errorBanner}>
-                    <Ionicons
-                      name="alert-circle"
-                      size={scale(20)}
-                      color="#EF4444"
-                    />
-                    <Text style={styles.errorBannerText}>{submitError}</Text>
-                  </View>
-                )}
-
-                <TouchableOpacity
-                  style={[
-                    styles.submitButton,
-                    (joinMutation.isPending || investMutation.isPending) && styles.submitButtonDisabled,
-                  ]}
-                  onPress={handleSubmit}
-                  disabled={joinMutation.isPending || investMutation.isPending}
-                >
-                  {joinMutation.isPending || investMutation.isPending ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.submitButtonText}>
-                      {club.club_type === "live" ? "Submit Request" : "Invest Now"}
-                    </Text>
-                  )}
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.modalBackdrop}
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowJoinModal(false);
+            }}
+          />
+          <Animated.View style={[styles.modalSheet, animatedModalStyle]}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {club.club_type === "live" ? "Join Club Request" : "Invest in Club"}
+                </Text>
+                <TouchableOpacity onPress={() => {
+                  Keyboard.dismiss();
+                  setShowJoinModal(false);
+                }}>
+                  <Ionicons name="close" size={scale(24)} color="#64748B" />
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.modalBody}>
+                  <Text style={styles.modalSubtitle}>Investment Amount</Text>
+
+                  <View style={styles.quantityContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.quantityButton,
+                        quantity <= minQuantity && styles.quantityButtonDisabled,
+                      ]}
+                      onPress={() => quantity > minQuantity && setQuantity(q => q - 1)}
+                      disabled={quantity <= minQuantity}
+                    >
+                      <Ionicons name="remove" size={scale(20)} color={quantity <= minQuantity ? "#CBD5E1" : "#1E293B"} />
+                    </TouchableOpacity>
+
+                    <View style={styles.quantityValueContainer}>
+                      <Text style={styles.quantityValue}>{quantity}</Text>
+                      <Text style={styles.quantityLabel}>Shares</Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.quantityButton,
+                        quantity >= maxQuantity && styles.quantityButtonDisabled,
+                      ]}
+                      onPress={() => quantity < maxQuantity && setQuantity(q => q + 1)}
+                      disabled={quantity >= maxQuantity}
+                    >
+                      <Ionicons name="add" size={scale(20)} color={quantity >= maxQuantity ? "#CBD5E1" : "#1E293B"} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.amountSummary}>
+                    <Text style={styles.amountLabel}>Total Investment</Text>
+                    <Text style={styles.amountValue}>
+                      {formatCurrency(quantity * club.share_price)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.maxInvestmentContainer}>
+                    <Text style={styles.maxInvestmentText}>
+                      Maximum Investment: {formatCurrency(club.maximum_investment)}
+                    </Text>
+                  </View>
+
+                  {club.club_type === "live" && (
+                    <>
+                      <Text style={styles.modalSubtitle}>Notes</Text>
+                      <TextInput
+                        style={styles.notesInput}
+                        placeholder="Why do you want to join this club?"
+                        placeholderTextColor="#94A3B8"
+                        multiline
+                        numberOfLines={4}
+                        value={notes}
+                        onChangeText={(text) => {
+                          setNotes(text);
+                          setSubmitError(null);
+                        }}
+                        textAlignVertical="top"
+                      />
+                    </>
+                  )}
+
+                  {submitSuccess && (
+                    <View style={styles.successBanner}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={scale(20)}
+                        color="#10B981"
+                      />
+                      <Text style={styles.successBannerText}>{submitSuccess}</Text>
+                    </View>
+                  )}
+
+                  {submitError && (
+                    <View style={styles.errorBanner}>
+                      <Ionicons
+                        name="alert-circle"
+                        size={scale(20)}
+                        color="#EF4444"
+                      />
+                      <Text style={styles.errorBannerText}>{submitError}</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      (joinMutation.isPending || investMutation.isPending) && styles.submitButtonDisabled,
+                    ]}
+                    onPress={handleSubmit}
+                    disabled={joinMutation.isPending || investMutation.isPending}
+                  >
+                    {joinMutation.isPending || investMutation.isPending ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>
+                        {club.club_type === "live" ? "Submit Request" : "Invest Now"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </Animated.View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -998,17 +1325,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
-  modalContent: {
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalSheet: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: moderateScale(24),
     borderTopRightRadius: moderateScale(24),
+    maxHeight: SCREEN_HEIGHT * 0.9,
+  },
+  modalContent: {
     padding: moderateScale(20),
-    maxHeight: "90%",
   },
   modalHeader: {
     flexDirection: "row",
@@ -1155,6 +1487,129 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: "#FFFFFF",
     fontSize: moderateScale(16),
+    fontFamily: "Outfit_600SemiBold",
+  },
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    borderRadius: moderateScale(8),
+    padding: scale(4),
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: verticalScale(8),
+    alignItems: "center",
+    borderRadius: moderateScale(6),
+  },
+  activeTabButton: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#64748B",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: moderateScale(13),
+    color: "#64748B",
+    fontFamily: "Outfit_500Medium",
+  },
+  activeTabText: {
+    color: "#1E293B",
+    fontWeight: "600",
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#94A3B8",
+    fontSize: moderateScale(14),
+    fontFamily: "Outfit_400Regular",
+    paddingVertical: verticalScale(12),
+  },
+  memberItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: verticalScale(8),
+    gap: scale(12),
+  },
+  memberAvatar: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#E2E8F0",
+  },
+  avatarText: {
+    fontSize: moderateScale(16),
+    fontWeight: "600",
+    color: "#64748B",
+    fontFamily: "Outfit_600SemiBold",
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: moderateScale(14),
+    fontWeight: "600",
+    color: "#1E293B",
+    fontFamily: "Outfit_600SemiBold",
+  },
+  memberEmail: {
+    fontSize: moderateScale(12),
+    color: "#64748B",
+    fontFamily: "Outfit_400Regular",
+  },
+  expenseItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: verticalScale(8),
+  },
+  expenseLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(12),
+    flex: 1,
+  },
+  expenseIcon: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  expenseInfo: {
+    flex: 1,
+  },
+  expenseDescription: {
+    fontSize: moderateScale(13),
+    fontWeight: "500",
+    color: "#1E293B",
+    fontFamily: "Outfit_500Medium",
+    marginBottom: verticalScale(2),
+  },
+  expenseDate: {
+    fontSize: moderateScale(11),
+    color: "#94A3B8",
+    fontFamily: "Outfit_400Regular",
+  },
+  expenseAmount: {
+    fontSize: moderateScale(14),
+    fontWeight: "600",
+    color: "#EF4444",
     fontFamily: "Outfit_600SemiBold",
   },
 });

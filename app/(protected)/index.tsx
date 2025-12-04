@@ -135,7 +135,37 @@ export default function DashboardScreen() {
       .map((item) => ({
         value: item.profit,
         label: formatMonthLabel(item.month),
-      }))
+      }));
+
+    // Transform investment vs profit graph
+    const investmentVsProfitData = dashboard.investment_vs_profit_graph
+      .filter((item) => item.investment > 0 || item.profit > 0)
+      .map((item) => ({
+        month: formatMonthLabel(item.month),
+        investment: item.investment,
+        profit: item.profit,
+      }));
+
+    const investmentData = investmentVsProfitData.map((item) => ({
+      value: item.investment,
+      label: item.month,
+      dataPointText: '',
+    }));
+
+    const profitData = investmentVsProfitData.map((item) => ({
+      value: item.profit,
+      label: item.month,
+      dataPointText: '',
+    }));
+
+    // Transform transaction frequency graph
+    const transactionFrequencyGraph = dashboard.transaction_frequency_graph
+      .filter((item) => item.count > 0)
+      .map((item) => ({
+        value: item.count,
+        label: formatMonthLabel(item.month),
+        frontColor: "#8B5CF6",
+      }));
 
     // Get top 3 transactions for summary
     const transactions = dashboard.transaction_type_distribution
@@ -160,6 +190,19 @@ export default function DashboardScreen() {
         ? Math.max(...profitTrendGraph.map((item) => item.value)) * 1.2 // Add 20% padding
         : 500000;
 
+    const investmentVsProfitMaxValue =
+      investmentData.length > 0 || profitData.length > 0
+        ? Math.max(
+          ...investmentData.map((item) => item.value),
+          ...profitData.map((item) => item.value)
+        ) * 1.2
+        : 500000;
+
+    const transactionFrequencyMaxValue =
+      transactionFrequencyGraph.length > 0
+        ? Math.max(...transactionFrequencyGraph.map((item) => item.value)) * 1.2
+        : 50;
+
     // Calculate balance percentage change from balance trend
     const balanceTrend = dashboard.balance_trend_graph
       .filter((item: any) => item.balance > 0)
@@ -182,8 +225,13 @@ export default function DashboardScreen() {
       ongoing_clubs_count: dashboard.ongoing_clubs_count,
       money_flow_graph: moneyFlowGraph,
       profit_trend_graph: profitTrendGraph,
+      investment_data: investmentData,
+      profit_data: profitData,
+      transaction_frequency_graph: transactionFrequencyGraph,
       money_flow_max_value: moneyFlowMaxValue,
       profit_trend_max_value: profitTrendMaxValue,
+      investment_vs_profit_max_value: investmentVsProfitMaxValue,
+      transaction_frequency_max_value: transactionFrequencyMaxValue,
       transactions,
       balance_percentage_change: balancePercentageChange,
     };
@@ -473,6 +521,75 @@ export default function DashboardScreen() {
               width={width - moderateScale(110)}
               hideDataPoints={false}
               dataPointsColor="#2563EB"
+            />
+          </View>
+        </View>
+
+        {/* Investment vs Profit Chart */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Investment vs Profit</Text>
+          <View style={styles.chartContainer}>
+            <LineChart
+              data={dashboardData.investment_data}
+              data2={dashboardData.profit_data}
+              color1="#2563EB"
+              color2="#10B981"
+              thickness={3}
+              startFillColor1="rgba(37, 99, 235, 0.2)"
+              endFillColor1="rgba(37, 99, 235, 0.01)"
+              startFillColor2="rgba(16, 185, 129, 0.2)"
+              endFillColor2="rgba(16, 185, 129, 0.01)"
+              startOpacity={0.9}
+              endOpacity={0.2}
+              initialSpacing={20}
+              noOfSections={4}
+              maxValue={dashboardData.investment_vs_profit_max_value}
+              yAxisTextStyle={{ color: "#94A3B8", fontSize: 10 }}
+              yAxisLabelContainerStyle={{ paddingRight: 10 }}
+              hideRules
+              curved
+              height={180}
+              width={width - moderateScale(110)}
+              hideDataPoints={false}
+              dataPointsColor1="#2563EB"
+              dataPointsColor2="#10B981"
+            />
+            <View style={styles.legendContainer}>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#2563EB" }]}
+                />
+                <Text style={styles.legendText}>Investment</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#10B981" }]}
+                />
+                <Text style={styles.legendText}>Profit</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Transaction Frequency Chart */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Transaction Activity</Text>
+          <View style={styles.chartContainer}>
+            <BarChart
+              data={dashboardData.transaction_frequency_graph}
+              barWidth={16}
+              spacing={24}
+              roundedTop
+              roundedBottom
+              hideRules
+              xAxisThickness={0}
+              yAxisThickness={0}
+              yAxisTextStyle={{ color: "#94A3B8", fontSize: 10 }}
+              yAxisLabelContainerStyle={{ paddingRight: 10 }}
+              noOfSections={3}
+              maxValue={dashboardData.transaction_frequency_max_value}
+              height={180}
+              width={width - moderateScale(110)}
             />
           </View>
         </View>

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -97,12 +98,11 @@ export default function LoginScreen() {
         >
           <View style={styles.headerContainer}>
             <View style={styles.iconContainer}>
-              <LinearGradient
-                colors={["#2563EB", "#4F46E5"]}
-                style={styles.iconGradient}
-              >
-                <Ionicons name="business" size={scale(32)} color="#FFF" />
-              </LinearGradient>
+              <Image
+                source={require("../../assets/logo/blueprint.png")}
+                style={styles.logoImage}
+                contentFit="contain"
+              />
             </View>
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>
@@ -174,55 +174,63 @@ export default function LoginScreen() {
               </View>
             )}
 
-            <TouchableOpacity
-              style={[
-                styles.loginButton,
-                loginMutation.isPending && styles.loginButtonDisabled,
-              ]}
-              onPress={handleLogin}
-              activeOpacity={0.8}
-              disabled={loginMutation.isPending}
-            >
-              <LinearGradient
-                colors={
-                  loginMutation.isPending
-                    ? ["#94A3B8", "#94A3B8"]
-                    : ["#2563EB", "#4F46E5"]
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientButton}
+            {/* Sign In Buttons Row */}
+            <View style={styles.buttonsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.loginButton,
+                  loginMutation.isPending && styles.loginButtonDisabled,
+                ]}
+                onPress={handleLogin}
+                activeOpacity={0.8}
+                disabled={loginMutation.isPending}
               >
-                {loginMutation.isPending ? (
-                  <>
-                    <ActivityIndicator size="small" color="#FFF" />
-                    <Text
-                      style={[styles.loginButtonText, { marginLeft: scale(8) }]}
-                    >
-                      Signing In...
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.loginButtonText}>Sign In</Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={scale(20)}
-                      color="#FFF"
-                    />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={
+                    loginMutation.isPending
+                      ? ["#94A3B8", "#94A3B8"]
+                      : ["#2563EB", "#4F46E5"]
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.gradientButton}
+                >
+                  {loginMutation.isPending ? (
+                    <>
+                      <ActivityIndicator size="small" color="#FFF" />
+                      <Text
+                        style={[styles.loginButtonText, { marginLeft: scale(8) }]}
+                      >
+                        Signing In...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.loginButtonText}>Sign In</Text>
+                      <Ionicons
+                        name="arrow-forward"
+                        size={scale(20)}
+                        color="#FFF"
+                      />
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Biometric Sign In Button */}
+              <TouchableOpacity
+                style={styles.biometricButton}
+                onPress={() => {
+                  // TODO: Implement biometric authentication
+                  console.log('Biometric sign-in pressed');
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="finger-print" size={scale(28)} color="#2563EB" />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              By signing in, you agree to our{" "}
-              <Text style={styles.linkText}>Terms</Text> and{" "}
-              <Text style={styles.linkText}>Privacy Policy</Text>
-            </Text>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -249,14 +257,6 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginBottom: verticalScale(24),
-    shadowColor: "#2563EB",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 10,
   },
   iconGradient: {
     width: scale(80),
@@ -266,8 +266,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     transform: [{ rotate: "-10deg" }],
   },
+  logoImage: {
+    width: scale(80),
+    height: scale(80),
+  },
   title: {
-    fontSize: moderateScale(28),
+    fontSize: moderateScale(24),
     fontWeight: "700",
     color: "#1E293B",
     marginBottom: verticalScale(8),
@@ -325,6 +329,7 @@ const styles = StyleSheet.create({
     padding: scale(4),
   },
   loginButton: {
+    flex: 1,
     borderRadius: moderateScale(16),
     overflow: "hidden",
     shadowColor: "#2563EB",
@@ -349,20 +354,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     marginRight: scale(8),
   },
-  footer: {
-    marginTop: "auto",
-    alignItems: "center",
-  },
-  footerText: {
-    fontSize: moderateScale(12),
-    color: "#94A3B8",
-    textAlign: "center",
-    lineHeight: verticalScale(18),
-  },
-  linkText: {
-    color: "#2563EB",
-    fontWeight: "600",
-  },
   errorContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -384,5 +375,27 @@ const styles = StyleSheet.create({
   },
   loginButtonDisabled: {
     opacity: 0.7,
+  },
+  buttonsRow: {
+    flexDirection: "row",
+    gap: scale(12),
+  },
+  biometricButton: {
+    width: scale(56),
+    height: verticalScale(56),
+    backgroundColor: "#FFFFFF",
+    borderRadius: moderateScale(16),
+    borderWidth: 2,
+    borderColor: "#E2E8F0",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#94A3B8",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
 });

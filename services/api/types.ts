@@ -128,15 +128,44 @@ export interface ClubActivity {
   created_at_human: string;
 }
 
+export interface ClubMember {
+  name: string;
+  email: string;
+  avatar: string | null;
+  investor_id: string;
+}
+
+export interface ClubExpense {
+  description: string;
+  amount: number;
+  note: string;
+  category: string;
+  created_by: string;
+  created_at: string;
+  expense_date: string;
+}
+
+export interface UserInvestmentInfo {
+  share_qty: number;
+  investment_amount: number;
+  share_price: number;
+  joined_at: string;
+  status: string | null;
+}
+
 export interface ClubDetail extends Club {
-  club_type: "live" | "ongoing" | "settled";
+  club_type: "live" | "ongoing" | "settled" | "pending";
   management_fee: number;
   performance_fee: number;
   investment_strategy: string;
   is_member: boolean;
+  user_investment_info?: UserInvestmentInfo;
   user_personal_documents: ClubDocument[];
+  member_documents: ClubDocument[];
   public_documents: ClubDocument[];
   activities: ClubActivity[];
+  members: ClubMember[];
+  expenses: ClubExpense[];
 }
 
 export type ClubDetailResponse = ApiResponse<ClubDetail>;

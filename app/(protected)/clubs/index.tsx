@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  ScrollView,
   SectionList,
   StatusBar,
   StyleSheet,
@@ -43,7 +44,7 @@ export default function ClubsScreen() {
   const router = useRouter();
   const { formatCurrency } = useCurrency();
   const [activeFilter, setActiveFilter] = useState<
-    "live" | "ongoing" | "settled"
+    "live" | "pending" | "ongoing" | "settled"
   >("live");
 
   const {
@@ -151,58 +152,77 @@ export default function ClubsScreen() {
 
   const renderSectionHeader = () => (
     <View style={styles.stickyHeaderContainer}>
-      <View style={styles.filterWrapper}>
-        <View style={styles.filterContainer}>
-          <TouchableOpacity
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterContainer}
+      >
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            activeFilter === "live" && styles.filterTabActive,
+          ]}
+          onPress={() => setActiveFilter("live")}
+        >
+          <Text
             style={[
-              styles.filterTab,
-              activeFilter === "live" && styles.filterTabActive,
+              styles.filterTabText,
+              activeFilter === "live" && styles.filterTabTextActive,
             ]}
-            onPress={() => setActiveFilter("live")}
           >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === "live" && styles.filterTabTextActive,
-              ]}
-            >
-              Live
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+            Live
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            activeFilter === "pending" && styles.filterTabActive,
+          ]}
+          onPress={() => setActiveFilter("pending")}
+        >
+          <Text
             style={[
-              styles.filterTab,
-              activeFilter === "ongoing" && styles.filterTabActive,
+              styles.filterTabText,
+              activeFilter === "pending" && styles.filterTabTextActive,
             ]}
-            onPress={() => setActiveFilter("ongoing")}
           >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === "ongoing" && styles.filterTabTextActive,
-              ]}
-            >
-              Ongoing
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+            Pending
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            activeFilter === "ongoing" && styles.filterTabActive,
+          ]}
+          onPress={() => setActiveFilter("ongoing")}
+        >
+          <Text
             style={[
-              styles.filterTab,
-              activeFilter === "settled" && styles.filterTabActive,
+              styles.filterTabText,
+              activeFilter === "ongoing" && styles.filterTabTextActive,
             ]}
-            onPress={() => setActiveFilter("settled")}
           >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === "settled" && styles.filterTabTextActive,
-              ]}
-            >
-              Settled
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            Ongoing
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            activeFilter === "settled" && styles.filterTabActive,
+          ]}
+          onPress={() => setActiveFilter("settled")}
+        >
+          <Text
+            style={[
+              styles.filterTabText,
+              activeFilter === "settled" && styles.filterTabTextActive,
+            ]}
+          >
+            Settled
+          </Text>
+        </TouchableOpacity>
+
+      </ScrollView>
     </View>
   );
 
@@ -256,7 +276,7 @@ export default function ClubsScreen() {
               <View style={styles.summaryContainer}>
                 <StatCard
                   icon="briefcase"
-                  label="Active Clubs"
+                  label="Clubs"
                   value={clubs.length}
                   color="#3B82F6"
                 />
@@ -285,13 +305,13 @@ export default function ClubsScreen() {
                   icon="stats-chart"
                   label="Avg Return"
                   value={`${clubs.length > 0
-                      ? (
-                        clubs.reduce(
-                          (sum, club) => sum + club.expected_return,
-                          0
-                        ) / clubs.length
-                      ).toFixed(2)
-                      : 0
+                    ? (
+                      clubs.reduce(
+                        (sum, club) => sum + club.expected_return,
+                        0
+                      ) / clubs.length
+                    ).toFixed(2)
+                    : 0
                     }%`}
                   color="#F59E0B"
                 />
@@ -369,14 +389,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
     paddingBottom: verticalScale(16),
   },
-  filterWrapper: {
-    paddingHorizontal: moderateScale(20),
-    alignItems: "center",
-  },
   filterContainer: {
     flexDirection: "row",
     gap: scale(12),
-    justifyContent: "center",
+    paddingHorizontal: moderateScale(0),
   },
   filterTab: {
     paddingHorizontal: moderateScale(16),

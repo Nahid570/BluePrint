@@ -10,7 +10,7 @@ import {
  * Get clubs list with optional type filter
  */
 export const getClubs = async (params?: {
-  type?: "live" | "ongoing" | "settled";
+  type?: "live" | "ongoing" | "settled" | "pending";
 }): Promise<ClubsListResponse> => {
   try {
     const response = await httpClient.get<ClubsListResponse>(

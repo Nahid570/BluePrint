@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -25,6 +26,7 @@ export default function ProfileScreen() {
   const { signOut } = useSession();
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
 
   // Fetch profile data
   const {
@@ -82,17 +84,12 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign Out",
-        onPress: signOut,
-        style: "destructive",
-      },
-    ]);
+    setShowSignOutModal(true);
+  };
+
+  const confirmSignOut = () => {
+    setShowSignOutModal(false);
+    signOut();
   };
 
   // Loading state
@@ -208,17 +205,28 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Stats Row */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Total Shares</Text>
-            <Text style={styles.statValue}>{profileData.share_quantity}</Text>
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statGridCard}>
+            <Text style={styles.statGridLabel}>Total Shares</Text>
+            <Text style={styles.statGridValue}>{profileData.share_quantity}</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Wallet Balance</Text>
-            <Text style={styles.statValue}>
+          <View style={styles.statGridCard}>
+            <Text style={styles.statGridLabel}>Share Amount</Text>
+            <Text style={styles.statGridValue}>
+              {formatCurrency(profileData.share_amount)}
+            </Text>
+          </View>
+          <View style={styles.statGridCard}>
+            <Text style={styles.statGridLabel}>Wallet Balance</Text>
+            <Text style={styles.statGridValue}>
               {formatCurrency(profileData.balance)}
+            </Text>
+          </View>
+          <View style={styles.statGridCard}>
+            <Text style={styles.statGridLabel}>Status</Text>
+            <Text style={[styles.statGridValue, { color: profileData.status === "active" ? "#10B981" : "#EF4444" }]}>
+              {profileData.status.charAt(0).toUpperCase() + profileData.status.slice(1)}
             </Text>
           </View>
         </View>
@@ -347,6 +355,44 @@ export default function ProfileScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Sign Out Confirmation Modal */}
+      <Modal
+        visible={showSignOutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSignOutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <View style={styles.modalIcon}>
+                <Ionicons name="log-out-outline" size={scale(32)} color="#EF4444" />
+              </View>
+            </View>
+
+            <Text style={styles.modalTitle}>Sign Out</Text>
+            <Text style={styles.modalMessage}>
+              Are you sure you want to sign out? You'll need to log in again to access your account.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setShowSignOutModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={confirmSignOut}
+              >
+                <Text style={styles.modalConfirmText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -412,35 +458,40 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontFamily: "Outfit_500Medium",
   },
-  statsContainer: {
+  statsGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: scale(12),
+    marginBottom: verticalScale(24),
+  },
+  statGridCard: {
+    width: "48%",
     backgroundColor: "#FFFFFF",
     borderRadius: moderateScale(16),
     padding: moderateScale(16),
-    marginBottom: verticalScale(24),
     shadowColor: "#64748B",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  statCard: {
-    flex: 1,
+  statIconWrapper: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(10),
+    backgroundColor: "#F8FAFC",
+    justifyContent: "center",
     alignItems: "center",
+    marginBottom: verticalScale(8),
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: "#E2E8F0",
-    marginHorizontal: scale(16),
-  },
-  statLabel: {
-    fontSize: moderateScale(12),
+  statGridLabel: {
+    fontSize: moderateScale(11),
     color: "#64748B",
     marginBottom: verticalScale(4),
     fontFamily: "Outfit_400Regular",
   },
-  statValue: {
-    fontSize: moderateScale(18),
+  statGridValue: {
+    fontSize: moderateScale(16),
     fontWeight: "700",
     color: "#1E293B",
     fontFamily: "Outfit_700Bold",
@@ -607,5 +658,81 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#FFFFFF",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: moderateScale(20),
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: moderateScale(20),
+    padding: moderateScale(24),
+    width: "100%",
+    maxWidth: scale(340),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalIconContainer: {
+    alignItems: "center",
+    marginBottom: verticalScale(16),
+  },
+  modalIcon: {
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(32),
+    backgroundColor: "#FEF2F2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: "700",
+    color: "#1E293B",
+    textAlign: "center",
+    marginBottom: verticalScale(8),
+    fontFamily: "Outfit_700Bold",
+  },
+  modalMessage: {
+    fontSize: moderateScale(14),
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: moderateScale(20),
+    marginBottom: verticalScale(24),
+    fontFamily: "Outfit_400Regular",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: scale(12),
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: verticalScale(12),
+    borderRadius: moderateScale(12),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCancelButton: {
+    backgroundColor: "#F1F5F9",
+  },
+  modalConfirmButton: {
+    backgroundColor: "#EF4444",
+  },
+  modalCancelText: {
+    fontSize: moderateScale(14),
+    fontWeight: "600",
+    color: "#64748B",
+    fontFamily: "Outfit_600SemiBold",
+  },
+  modalConfirmText: {
+    fontSize: moderateScale(14),
+    fontWeight: "600",
+    color: "#FFFFFF",
+    fontFamily: "Outfit_600SemiBold",
   },
 });

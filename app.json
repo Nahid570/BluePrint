@@ -1,27 +1,25 @@
 {
   "expo": {
-    "name": "BluePrint",
-    "slug": "BluePrint",
+    "name": "BluePrint EYE",
+    "slug": "BluePrint EYE",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "blueprint",
+    "scheme": "blueprinteye",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.BluePrint"
+      "bundleIdentifier": "undefined"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png",
+        "monochromeImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.BluePrint"
+      "package": "undefined"
     },
     "web": {
       "output": "static",
@@ -32,11 +30,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/logo/blueprint.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#F8FAFC",
           "dark": {
+            "image": "./assets/logo/blueprint.png",
             "backgroundColor": "#000000"
           }
         }
