@@ -1,14 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Keyboard,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,7 +21,6 @@ import {
   View,
 } from "react-native";
 import Animated, {
-  useAnimatedKeyboard,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -28,7 +30,11 @@ import Animated, {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
 import { useCurrency } from "../../../hooks/useCurrency";
-import { getClubDetail, investInClub, joinClubRequest } from "../../../services/api/clubs";
+import {
+  getClubDetail,
+  investInClub,
+  joinClubRequest,
+} from "../../../services/api/clubs";
 
 const getCategoryColor = (color: string) => {
   const colors: any = {
@@ -56,7 +62,9 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ClubDetailScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const scaleAnim = useSharedValue(1);
   const { formatCurrency } = useCurrency();
 
@@ -68,17 +76,12 @@ export default function ClubDetailScreen() {
   const [maxQuantity, setMaxQuantity] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [activeDocTab, setActiveDocTab] = useState<"public" | "member" | "personal">("public");
-  const [activeInfoTab, setActiveInfoTab] = useState<"members" | "expenses" | "activities">("members");
-
-  // Keyboard animation for modal
-  const keyboard = useAnimatedKeyboard();
-  
-  const animatedModalStyle = useAnimatedStyle(() => {
-    return {
-      paddingBottom: keyboard.height.value,
-    };
-  });
+  const [activeDocTab, setActiveDocTab] = useState<
+    "public" | "member" | "personal"
+  >("public");
+  const [activeInfoTab, setActiveInfoTab] = useState<
+    "members" | "expenses" | "activities"
+  >("members");
 
   useEffect(() => {
     scaleAnim.value = withRepeat(
@@ -90,6 +93,16 @@ export default function ClubDetailScreen() {
       true
     );
   }, []);
+
+  // Hide tab bar when modal is visible
+  useLayoutEffect(() => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.setOptions({
+        tabBarStyle: showJoinModal ? { display: "none" } : undefined,
+      });
+    }
+  }, [showJoinModal, navigation]);
 
   const animatedFabStyle = useAnimatedStyle(() => {
     return {
@@ -137,6 +150,14 @@ export default function ClubDetailScreen() {
       );
       setNotes("");
       setQuantity(minQuantity);
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["clubs"] });
+      queryClient.invalidateQueries({ queryKey: ["club-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions-categories"] });
     },
     onError: (error: any) => {
       setSubmitError(error.message || "Failed to submit request");
@@ -151,9 +172,19 @@ export default function ClubDetailScreen() {
     }) => investInClub(id!, data),
     onSuccess: (response) => {
       setSubmitError(null);
-      setSubmitSuccess(response.message || "Investment processed successfully.");
+      setSubmitSuccess(
+        response.message || "Investment processed successfully."
+      );
       setQuantity(minQuantity);
       refetch(); // Refresh club data to show updated stats
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["clubs"] });
+      queryClient.invalidateQueries({ queryKey: ["club-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions-categories"] });
     },
     onError: (error: any) => {
       setSubmitSuccess(null);
@@ -171,15 +202,19 @@ export default function ClubDetailScreen() {
         return;
       }
 
+      const investmentAmount =
+        Math.round(quantity * (club?.share_price || 0) * 100) / 100;
       joinMutation.mutate({
         invest_quantity: quantity,
-        investment_amount: quantity * (club?.share_price || 0),
+        investment_amount: investmentAmount,
         notes: notes,
       });
     } else if (club?.club_type === "ongoing") {
+      const investmentAmount =
+        Math.round(quantity * (club?.share_price || 0) * 100) / 100;
       investMutation.mutate({
         invest_quantity: quantity,
-        investment_amount: quantity * (club?.share_price || 0),
+        investment_amount: investmentAmount,
       });
     }
   };
@@ -216,11 +251,7 @@ export default function ClubDetailScreen() {
         onPress={() => Linking.openURL(doc.file_url)}
       >
         <View style={styles.documentLeft}>
-          <Ionicons
-            name="document-text"
-            size={scale(20)}
-            color="#3B82F6"
-          />
+          <Ionicons name="document-text" size={scale(20)} color="#3B82F6" />
           <View style={styles.documentInfo}>
             <Text style={styles.documentTitle}>{doc.title}</Text>
             <Text style={styles.documentType}>
@@ -228,11 +259,7 @@ export default function ClubDetailScreen() {
             </Text>
           </View>
         </View>
-        <Ionicons
-          name="download-outline"
-          size={scale(20)}
-          color="#94A3B8"
-        />
+        <Ionicons name="download-outline" size={scale(20)} color="#94A3B8" />
       </TouchableOpacity>
       <View style={styles.divider} />
     </View>
@@ -458,7 +485,9 @@ export default function ClubDetailScreen() {
                 <View style={styles.metricItem}>
                   <Text style={styles.metricLabel}>Total Investment</Text>
                   <Text style={[styles.metricValue, { color: "#2563EB" }]}>
-                    {formatCurrency(club.user_investment_info.investment_amount)}
+                    {formatCurrency(
+                      club.user_investment_info.investment_amount
+                    )}
                   </Text>
                 </View>
                 <View style={styles.metricItem}>
@@ -470,7 +499,9 @@ export default function ClubDetailScreen() {
                 <View style={styles.metricItem}>
                   <Text style={styles.metricLabel}>Joined Date</Text>
                   <Text style={styles.metricValue} numberOfLines={1}>
-                    {new Date(club.user_investment_info.joined_at).toLocaleDateString()}
+                    {new Date(
+                      club.user_investment_info.joined_at
+                    ).toLocaleDateString()}
                   </Text>
                 </View>
               </View>
@@ -695,21 +726,29 @@ export default function ClubDetailScreen() {
                   (club.public_documents?.length > 0 ? (
                     club.public_documents.map((doc) => renderDocumentItem(doc))
                   ) : (
-                    <Text style={styles.emptyText}>No public documents available</Text>
+                    <Text style={styles.emptyText}>
+                      No public documents available
+                    </Text>
                   ))}
 
                 {activeDocTab === "member" &&
                   (club.member_documents?.length > 0 ? (
                     club.member_documents.map((doc) => renderDocumentItem(doc))
                   ) : (
-                    <Text style={styles.emptyText}>No member documents available</Text>
+                    <Text style={styles.emptyText}>
+                      No member documents available
+                    </Text>
                   ))}
 
                 {activeDocTab === "personal" &&
                   (club.user_personal_documents?.length > 0 ? (
-                    club.user_personal_documents.map((doc) => renderDocumentItem(doc))
+                    club.user_personal_documents.map((doc) =>
+                      renderDocumentItem(doc)
+                    )
                   ) : (
-                    <Text style={styles.emptyText}>No personal documents available</Text>
+                    <Text style={styles.emptyText}>
+                      No personal documents available
+                    </Text>
                   ))}
               </View>
             </View>
@@ -820,7 +859,9 @@ export default function ClubDetailScreen() {
 
                 {activeInfoTab === "expenses" &&
                   (club.expenses?.length > 0 ? (
-                    club.expenses.map((expense, index) => renderExpenseItem(expense, index))
+                    club.expenses.map((expense, index) =>
+                      renderExpenseItem(expense, index)
+                    )
                   ) : (
                     <Text style={styles.emptyText}>No expenses recorded</Text>
                   ))}
@@ -841,7 +882,8 @@ export default function ClubDetailScreen() {
                               {activity.description}
                             </Text>
                             <Text style={styles.activityMeta}>
-                              {activity.causer_name} • {activity.created_at_human}
+                              {activity.causer_name} •{" "}
+                              {activity.created_at_human}
                             </Text>
                           </View>
                         </View>
@@ -888,16 +930,18 @@ export default function ClubDetailScreen() {
       </ScrollView>
 
       {/* FAB Join/Invest Button */}
-      {((!club.is_member && club.club_type === "live") || club.club_type === "ongoing") && (
-        <Animated.View style={[styles.fabContainer, animatedFabStyle]}>
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={() => setShowJoinModal(true)}
-          >
-            <Ionicons name="add" size={scale(24)} color="#FFFFFF" />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+      {!showJoinModal &&
+        ((!club.is_member && club.club_type === "live") ||
+          club.club_type === "ongoing") && (
+          <Animated.View style={[styles.fabContainer, animatedFabStyle]}>
+            <TouchableOpacity
+              style={styles.fab}
+              onPress={() => setShowJoinModal(true)}
+            >
+              <Ionicons name="add" size={scale(24)} color="#FFFFFF" />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
       {/* Join/Invest Modal */}
       <Modal
@@ -909,140 +953,179 @@ export default function ClubDetailScreen() {
           setShowJoinModal(false);
         }}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            activeOpacity={1}
-            style={styles.modalBackdrop}
-            onPress={() => {
-              Keyboard.dismiss();
-              setShowJoinModal(false);
-            }}
-          />
-          <Animated.View style={[styles.modalSheet, animatedModalStyle]}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {club.club_type === "live" ? "Join Club Request" : "Invest in Club"}
-                </Text>
-                <TouchableOpacity onPress={() => {
-                  Keyboard.dismiss();
-                  setShowJoinModal(false);
-                }}>
-                  <Ionicons name="close" size={scale(24)} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                <View style={styles.modalBody}>
-                  <Text style={styles.modalSubtitle}>Investment Amount</Text>
-
-                  <View style={styles.quantityContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.quantityButton,
-                        quantity <= minQuantity && styles.quantityButtonDisabled,
-                      ]}
-                      onPress={() => quantity > minQuantity && setQuantity(q => q - 1)}
-                      disabled={quantity <= minQuantity}
-                    >
-                      <Ionicons name="remove" size={scale(20)} color={quantity <= minQuantity ? "#CBD5E1" : "#1E293B"} />
-                    </TouchableOpacity>
-
-                    <View style={styles.quantityValueContainer}>
-                      <Text style={styles.quantityValue}>{quantity}</Text>
-                      <Text style={styles.quantityLabel}>Shares</Text>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.quantityButton,
-                        quantity >= maxQuantity && styles.quantityButtonDisabled,
-                      ]}
-                      onPress={() => quantity < maxQuantity && setQuantity(q => q + 1)}
-                      disabled={quantity >= maxQuantity}
-                    >
-                      <Ionicons name="add" size={scale(20)} color={quantity >= maxQuantity ? "#CBD5E1" : "#1E293B"} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.amountSummary}>
-                    <Text style={styles.amountLabel}>Total Investment</Text>
-                    <Text style={styles.amountValue}>
-                      {formatCurrency(quantity * club.share_price)}
-                    </Text>
-                  </View>
-
-                  <View style={styles.maxInvestmentContainer}>
-                    <Text style={styles.maxInvestmentText}>
-                      Maximum Investment: {formatCurrency(club.maximum_investment)}
-                    </Text>
-                  </View>
-
-                  {club.club_type === "live" && (
-                    <>
-                      <Text style={styles.modalSubtitle}>Notes</Text>
-                      <TextInput
-                        style={styles.notesInput}
-                        placeholder="Why do you want to join this club?"
-                        placeholderTextColor="#94A3B8"
-                        multiline
-                        numberOfLines={4}
-                        value={notes}
-                        onChangeText={(text) => {
-                          setNotes(text);
-                          setSubmitError(null);
-                        }}
-                        textAlignVertical="top"
-                      />
-                    </>
-                  )}
-
-                  {submitSuccess && (
-                    <View style={styles.successBanner}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={scale(20)}
-                        color="#10B981"
-                      />
-                      <Text style={styles.successBannerText}>{submitSuccess}</Text>
-                    </View>
-                  )}
-
-                  {submitError && (
-                    <View style={styles.errorBanner}>
-                      <Ionicons
-                        name="alert-circle"
-                        size={scale(20)}
-                        color="#EF4444"
-                      />
-                      <Text style={styles.errorBannerText}>{submitError}</Text>
-                    </View>
-                  )}
-
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalBackdrop}
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowJoinModal(false);
+              }}
+            />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {club.club_type === "live"
+                      ? "Join Club Request"
+                      : "Invest in Club"}
+                  </Text>
                   <TouchableOpacity
-                    style={[
-                      styles.submitButton,
-                      (joinMutation.isPending || investMutation.isPending) && styles.submitButtonDisabled,
-                    ]}
-                    onPress={handleSubmit}
-                    disabled={joinMutation.isPending || investMutation.isPending}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowJoinModal(false);
+                    }}
                   >
-                    {joinMutation.isPending || investMutation.isPending ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.submitButtonText}>
-                        {club.club_type === "live" ? "Submit Request" : "Invest Now"}
-                      </Text>
-                    )}
+                    <Ionicons name="close" size={scale(24)} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: verticalScale(24) }}
+                >
+                  <View style={styles.modalBody}>
+                    <Text style={styles.modalSubtitle}>Investment Amount</Text>
+
+                    <View style={styles.quantityContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.quantityButton,
+                          quantity <= minQuantity &&
+                            styles.quantityButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          quantity > minQuantity && setQuantity((q) => q - 1)
+                        }
+                        disabled={quantity <= minQuantity}
+                      >
+                        <Ionicons
+                          name="remove"
+                          size={scale(20)}
+                          color={
+                            quantity <= minQuantity ? "#CBD5E1" : "#1E293B"
+                          }
+                        />
+                      </TouchableOpacity>
+
+                      <View style={styles.quantityValueContainer}>
+                        <Text style={styles.quantityValue}>{quantity}</Text>
+                        <Text style={styles.quantityLabel}>Shares</Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.quantityButton,
+                          quantity >= maxQuantity &&
+                            styles.quantityButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          quantity < maxQuantity && setQuantity((q) => q + 1)
+                        }
+                        disabled={quantity >= maxQuantity}
+                      >
+                        <Ionicons
+                          name="add"
+                          size={scale(20)}
+                          color={
+                            quantity >= maxQuantity ? "#CBD5E1" : "#1E293B"
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.amountSummary}>
+                      <Text style={styles.amountLabel}>Total Investment</Text>
+                      <Text style={styles.amountValue}>
+                        {formatCurrency(quantity * club.share_price)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.maxInvestmentContainer}>
+                      <Text style={styles.maxInvestmentText}>
+                        Maximum Investment:{" "}
+                        {formatCurrency(club.maximum_investment)}
+                      </Text>
+                    </View>
+
+                    {club.club_type === "live" && (
+                      <>
+                        <Text style={styles.modalSubtitle}>Notes</Text>
+                        <TextInput
+                          style={styles.notesInput}
+                          placeholder="Why do you want to join this club?"
+                          placeholderTextColor="#94A3B8"
+                          multiline
+                          numberOfLines={4}
+                          value={notes}
+                          onChangeText={(text) => {
+                            setNotes(text);
+                            setSubmitError(null);
+                          }}
+                          textAlignVertical="top"
+                        />
+                      </>
+                    )}
+
+                    {submitSuccess && (
+                      <View style={styles.successBanner}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={scale(20)}
+                          color="#10B981"
+                        />
+                        <Text style={styles.successBannerText}>
+                          {submitSuccess}
+                        </Text>
+                      </View>
+                    )}
+
+                    {submitError && (
+                      <View style={styles.errorBanner}>
+                        <Ionicons
+                          name="alert-circle"
+                          size={scale(20)}
+                          color="#EF4444"
+                        />
+                        <Text style={styles.errorBannerText}>
+                          {submitError}
+                        </Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.submitButton,
+                        (joinMutation.isPending || investMutation.isPending) &&
+                          styles.submitButtonDisabled,
+                      ]}
+                      onPress={handleSubmit}
+                      disabled={
+                        joinMutation.isPending || investMutation.isPending
+                      }
+                    >
+                      {joinMutation.isPending || investMutation.isPending ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.submitButtonText}>
+                          {club.club_type === "live"
+                            ? "Submit Request"
+                            : "Invest Now"}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
             </View>
-          </Animated.View>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -1338,6 +1421,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: moderateScale(24),
     borderTopRightRadius: moderateScale(24),
     maxHeight: SCREEN_HEIGHT * 0.9,
+    width: "100%",
   },
   modalContent: {
     padding: moderateScale(20),

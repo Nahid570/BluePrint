@@ -199,7 +199,10 @@ export default function LoginScreen() {
                     <>
                       <ActivityIndicator size="small" color="#FFF" />
                       <Text
-                        style={[styles.loginButtonText, { marginLeft: scale(8) }]}
+                        style={[
+                          styles.loginButtonText,
+                          { marginLeft: scale(8) },
+                        ]}
                       >
                         Signing In...
                       </Text>
@@ -222,15 +225,18 @@ export default function LoginScreen() {
                 style={styles.biometricButton}
                 onPress={() => {
                   // TODO: Implement biometric authentication
-                  console.log('Biometric sign-in pressed');
+                  console.log("Biometric sign-in pressed");
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="finger-print" size={scale(28)} color="#2563EB" />
+                <Ionicons
+                  name="finger-print"
+                  size={scale(28)}
+                  color="#2563EB"
+                />
               </TouchableOpacity>
             </View>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -20,7 +21,6 @@ import { moderateScale, scale, verticalScale } from "react-native-size-matters";
 import { useCurrency } from "../../hooks/useCurrency";
 import { getDashboard } from "../../services/api/dashboard";
 import { getProfile } from "../../services/api/profile";
-import { getReport } from "../../services/api/report";
 
 const { width } = Dimensions.get("window");
 
@@ -35,7 +35,8 @@ const getGreeting = (): string => {
   const hour = new Date().getHours();
   if (hour < 12) return "Good Morning,";
   if (hour < 17) return "Good Afternoon,";
-  return "Good Evening,";
+  if (hour < 21) return "Good Evening,";
+  return "Good Night,";
 };
 
 // Helper function to get initial from name
@@ -49,6 +50,14 @@ const getInitial = (name: string): string => {
 export default function DashboardScreen() {
   const router = useRouter();
   const { formatCurrency } = useCurrency();
+  const [greeting, setGreeting] = useState(getGreeting());
+
+  // Update greeting when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setGreeting(getGreeting());
+    }, [])
+  );
 
   // Fetch dashboard data
   const {
@@ -59,17 +68,6 @@ export default function DashboardScreen() {
   } = useQuery({
     queryKey: ["dashboard"],
     queryFn: getDashboard,
-  });
-
-  // Fetch report data
-  const {
-    data: reportResponse,
-    isLoading: isLoadingReport,
-    error: reportError,
-    refetch: refetchReport,
-  } = useQuery({
-    queryKey: ["report"],
-    queryFn: getReport,
   });
 
   // Fetch profile data
@@ -84,32 +82,6 @@ export default function DashboardScreen() {
   });
 
   const dashboard = dashboardResponse?.data;
-  const report = reportResponse?.data;
-  const profile = profileResponse?.data;
-
-  // Calculate balance percentage change
-  const balanceData = useMemo(() => {
-    if (!dashboard?.balance_trend_graph || dashboard.balance_trend_graph.length === 0) {
-      return {
-        balance_trend_graph: [],
-        balance_percentage_change: 0,
-      };
-    }
-
-    const balanceTrend = dashboard.balance_trend_graph;
-    const firstBalance = balanceTrend[0].balance;
-    const lastBalance = balanceTrend[balanceTrend.length - 1].balance;
-
-    let balancePercentageChange = 0;
-    if (firstBalance !== 0) {
-      balancePercentageChange = ((lastBalance - firstBalance) / firstBalance) * 100;
-    }
-
-    return {
-      balance_trend_graph: balanceTrend,
-      balance_percentage_change: balancePercentageChange,
-    };
-  }, [dashboard]);
 
   // Transform API data to match UI structure
   const dashboardData = useMemo(() => {
@@ -128,6 +100,14 @@ export default function DashboardScreen() {
         },
         { value: item.outflow, frontColor: "#EF4444" },
       ]);
+
+    // Transform balance trend graph
+    const balanceTrendGraph = dashboard.balance_trend_graph
+      .filter((item) => item.balance > 0) // Only show months with balance
+      .map((item) => ({
+        value: item.balance,
+        label: formatMonthLabel(item.month),
+      }));
 
     // Transform profit trend graph
     const profitTrendGraph = dashboard.profit_trend_graph
@@ -149,34 +129,30 @@ export default function DashboardScreen() {
     const investmentData = investmentVsProfitData.map((item) => ({
       value: item.investment,
       label: item.month,
-      dataPointText: '',
+      dataPointText: "",
     }));
 
     const profitData = investmentVsProfitData.map((item) => ({
       value: item.profit,
       label: item.month,
-      dataPointText: '',
+      dataPointText: "",
     }));
 
-    // Transform transaction frequency graph
-    const transactionFrequencyGraph = dashboard.transaction_frequency_graph
-      .filter((item) => item.count > 0)
-      .map((item) => ({
-        value: item.count,
-        label: formatMonthLabel(item.month),
-        frontColor: "#8B5CF6",
-      }));
+    // Get top 3 transactions for summary from new API structure
+    const transactionTypes = [
+      { type: "deposit", label: "Deposit", data: dashboard.deposit },
+      { type: "withdrawal", label: "Withdrawal", data: dashboard.withdrawal },
+      { type: "profit", label: "Profit", data: dashboard.profit },
+    ];
 
-    // Get top 3 transactions for summary
-    const transactions = dashboard.transaction_type_distribution
-      .filter((t: any) => ["deposit", "withdrawal", "profit"].includes(t.type))
-      .map((t: any) => ({
+    const transactions = transactionTypes
+      .map((t) => ({
         type: t.type,
         label: t.label,
-        amount: t.total_amount,
-        count: t.count,
+        amount: t.data.amount,
+        count: t.data.count,
       }))
-      .sort((a: any, b: any) => b.amount - a.amount)
+      .sort((a, b) => b.amount - a.amount)
       .slice(0, 3);
 
     // Calculate dynamic max values for charts
@@ -184,6 +160,11 @@ export default function DashboardScreen() {
       moneyFlowGraph.length > 0
         ? Math.max(...moneyFlowGraph.map((item) => item.value)) * 1.2 // Add 20% padding
         : 2000000;
+
+    const balanceTrendMaxValue =
+      balanceTrendGraph.length > 0
+        ? Math.max(...balanceTrendGraph.map((item) => item.value)) * 1.2 // Add 20% padding
+        : 1500000;
 
     const profitTrendMaxValue =
       profitTrendGraph.length > 0
@@ -193,52 +174,33 @@ export default function DashboardScreen() {
     const investmentVsProfitMaxValue =
       investmentData.length > 0 || profitData.length > 0
         ? Math.max(
-          ...investmentData.map((item) => item.value),
-          ...profitData.map((item) => item.value)
-        ) * 1.2
+            ...investmentData.map((item) => item.value),
+            ...profitData.map((item) => item.value)
+          ) * 1.2
         : 500000;
-
-    const transactionFrequencyMaxValue =
-      transactionFrequencyGraph.length > 0
-        ? Math.max(...transactionFrequencyGraph.map((item) => item.value)) * 1.2
-        : 50;
-
-    // Calculate balance percentage change from balance trend
-    const balanceTrend = dashboard.balance_trend_graph
-      .filter((item: any) => item.balance > 0)
-      .sort((a: any, b: any) => a.month.localeCompare(b.month));
-
-    let balancePercentageChange = 0;
-    if (balanceTrend.length >= 2) {
-      const currentBalance = balanceTrend[balanceTrend.length - 1].balance;
-      const previousBalance = balanceTrend[balanceTrend.length - 2].balance;
-      if (previousBalance > 0) {
-        balancePercentageChange =
-          ((currentBalance - previousBalance) / previousBalance) * 100;
-      }
-    }
 
     return {
       available_balance: dashboard.available_balance,
       available_share_quantity: dashboard.available_share_quantity,
       available_share_amount: dashboard.available_share_amount,
       ongoing_clubs_count: dashboard.ongoing_clubs_count,
+      pending_clubs_count: dashboard.pending_clubs_count,
+      roi: dashboard.roi,
+      balance_trend_graph: balanceTrendGraph,
       money_flow_graph: moneyFlowGraph,
       profit_trend_graph: profitTrendGraph,
       investment_data: investmentData,
       profit_data: profitData,
-      transaction_frequency_graph: transactionFrequencyGraph,
+      balance_trend_max_value: balanceTrendMaxValue,
       money_flow_max_value: moneyFlowMaxValue,
       profit_trend_max_value: profitTrendMaxValue,
       investment_vs_profit_max_value: investmentVsProfitMaxValue,
-      transaction_frequency_max_value: transactionFrequencyMaxValue,
       transactions,
-      balance_percentage_change: balancePercentageChange,
     };
-  }, [dashboardResponse]);
+  }, [dashboard]);
 
   // Loading state
-  const isLoading = isLoadingDashboard || isLoadingReport || isLoadingProfile;
+  const isLoading = isLoadingDashboard || isLoadingProfile;
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
@@ -252,13 +214,8 @@ export default function DashboardScreen() {
   }
 
   // Error state
-  const error = dashboardError || reportError || profileError;
-  if (
-    error ||
-    !dashboardData ||
-    !reportResponse?.data ||
-    !profileResponse?.data
-  ) {
+  const error = dashboardError || profileError;
+  if (error || !dashboardData || !profileResponse?.data) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <StatusBar barStyle="dark-content" />
@@ -271,7 +228,6 @@ export default function DashboardScreen() {
             style={styles.retryButton}
             onPress={() => {
               refetchDashboard();
-              refetchReport();
               refetchProfile();
             }}
           >
@@ -282,8 +238,6 @@ export default function DashboardScreen() {
     );
   }
 
-  // Get report summary data
-  const reportSummary = reportResponse.data.summary;
   const userProfile = profileResponse.data;
 
   return (
@@ -296,7 +250,7 @@ export default function DashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.greeting}>{greeting}</Text>
             <Text style={styles.userName}>{userProfile.name}</Text>
           </View>
           <View style={styles.headerActions}>
@@ -312,7 +266,10 @@ export default function DashboardScreen() {
               <View style={styles.badge} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.avatar}
+              style={[
+                styles.avatar,
+                userProfile.avatar && { backgroundColor: "transparent" },
+              ]}
               onPress={() => router.push("/(protected)/profile")}
             >
               {userProfile.avatar ? (
@@ -343,35 +300,6 @@ export default function DashboardScreen() {
               {formatCurrency(dashboardData.available_balance)}
             </Text>
           </View>
-          <View style={styles.heroStats}>
-            <View style={styles.heroStatItem}>
-              <View
-                style={[
-                  styles.statIcon,
-                  {
-                    backgroundColor:
-                      dashboardData.balance_percentage_change >= 0
-                        ? "rgba(255,255,255,0.2)"
-                        : "rgba(239, 68, 68, 0.3)",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={
-                    dashboardData.balance_percentage_change >= 0
-                      ? "trending-up"
-                      : "trending-down"
-                  }
-                  size={scale(16)}
-                  color="#FFF"
-                />
-              </View>
-              <Text style={styles.statLabel}>
-                {dashboardData.balance_percentage_change >= 0 ? "+" : ""}
-                {dashboardData.balance_percentage_change.toFixed(1)}%
-              </Text>
-            </View>
-          </View>
         </LinearGradient>
 
         {/* Investment Summary */}
@@ -390,7 +318,7 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.investmentLabel}>Total Investment</Text>
               <Text style={styles.investmentValue}>
-                {formatCurrency(reportSummary.total_investment)}
+                {formatCurrency(dashboard?.investment?.amount ?? 0)}
               </Text>
             </View>
             <View style={styles.investmentCard}>
@@ -401,7 +329,7 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.investmentLabel}>Total Profit</Text>
               <Text style={[styles.investmentValue, { color: "#10B981" }]}>
-                {formatCurrency(reportSummary.total_profit)}
+                {formatCurrency(dashboard?.profit?.amount ?? 0)}
               </Text>
             </View>
             <View style={styles.investmentCard}>
@@ -412,7 +340,7 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.investmentLabel}>ROI</Text>
               <Text style={[styles.investmentValue, { color: "#F59E0B" }]}>
-                {reportSummary.roi_percentage}%
+                {dashboardData.roi.toFixed(2)}%
               </Text>
             </View>
           </ScrollView>
@@ -445,6 +373,15 @@ export default function DashboardScreen() {
               {dashboardData.ongoing_clubs_count}
             </Text>
             <Text style={styles.gridLabel}>Active Clubs</Text>
+          </View>
+          <View style={styles.gridItem}>
+            <View style={[styles.gridIcon, { backgroundColor: "#FEF3C7" }]}>
+              <Ionicons name="time-outline" size={scale(20)} color="#F59E0B" />
+            </View>
+            <Text style={styles.gridValue}>
+              {dashboardData.pending_clubs_count}
+            </Text>
+            <Text style={styles.gridLabel}>Pending Clubs</Text>
           </View>
           <View style={styles.gridItem}>
             <View style={[styles.gridIcon, { backgroundColor: "#ECFDF5" }]}>
@@ -495,6 +432,33 @@ export default function DashboardScreen() {
                 <Text style={styles.legendText}>Outflow</Text>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* Balance Trend Chart */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Balance Trend</Text>
+          <View style={styles.chartContainer}>
+            <LineChart
+              data={dashboardData.balance_trend_graph}
+              color="#8B5CF6"
+              thickness={3}
+              startFillColor="rgba(139, 92, 246, 0.2)"
+              endFillColor="rgba(139, 92, 246, 0.01)"
+              startOpacity={0.9}
+              endOpacity={0.2}
+              initialSpacing={20}
+              noOfSections={4}
+              maxValue={dashboardData.balance_trend_max_value}
+              yAxisTextStyle={{ color: "#94A3B8", fontSize: 10 }}
+              yAxisLabelContainerStyle={{ paddingRight: 10 }}
+              hideRules
+              curved
+              height={180}
+              width={width - moderateScale(110)}
+              hideDataPoints={false}
+              dataPointsColor="#8B5CF6"
+            />
           </View>
         </View>
 
@@ -571,29 +535,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Transaction Frequency Chart */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Transaction Activity</Text>
-          <View style={styles.chartContainer}>
-            <BarChart
-              data={dashboardData.transaction_frequency_graph}
-              barWidth={16}
-              spacing={24}
-              roundedTop
-              roundedBottom
-              hideRules
-              xAxisThickness={0}
-              yAxisThickness={0}
-              yAxisTextStyle={{ color: "#94A3B8", fontSize: 10 }}
-              yAxisLabelContainerStyle={{ paddingRight: 10 }}
-              noOfSections={3}
-              maxValue={dashboardData.transaction_frequency_max_value}
-              height={180}
-              width={width - moderateScale(110)}
-            />
-          </View>
-        </View>
-
         {/* Transaction Summary */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Transaction Summary</Text>
@@ -608,8 +549,8 @@ export default function DashboardScreen() {
                         item.type === "deposit"
                           ? "#ECFDF5"
                           : item.type === "withdrawal"
-                            ? "#FEF2F2"
-                            : "#EFF6FF",
+                          ? "#FEF2F2"
+                          : "#EFF6FF",
                     },
                   ]}
                 >
@@ -618,16 +559,16 @@ export default function DashboardScreen() {
                       item.type === "deposit"
                         ? "arrow-down"
                         : item.type === "withdrawal"
-                          ? "arrow-up"
-                          : "trending-up"
+                        ? "arrow-up"
+                        : "trending-up"
                     }
                     size={scale(18)}
                     color={
                       item.type === "deposit"
                         ? "#10B981"
                         : item.type === "withdrawal"
-                          ? "#EF4444"
-                          : "#3B82F6"
+                        ? "#EF4444"
+                        : "#3B82F6"
                     }
                   />
                 </View>
@@ -712,7 +653,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: scale(40),
     height: scale(40),
-    borderRadius: scale(12),
+    borderRadius: scale(20),
     backgroundColor: "#E0E7FF",
     justifyContent: "center",
     alignItems: "center",
@@ -721,6 +662,7 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: "100%",
     height: "100%",
+    borderRadius: scale(20),
   },
   avatarText: {
     fontSize: moderateScale(18),
@@ -747,31 +689,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "Outfit_700Bold",
   },
-  heroStats: {
-    alignItems: "flex-end",
-  },
-  heroStatItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    paddingHorizontal: scale(8),
-    paddingVertical: verticalScale(4),
-    borderRadius: scale(8),
-  },
-  statIcon: {
-    width: scale(20),
-    height: scale(20),
-    borderRadius: scale(10),
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: scale(4),
-  },
-  statLabel: {
-    fontSize: moderateScale(12),
-    fontWeight: "600",
-    color: "#FFFFFF",
-    fontFamily: "Outfit_500Medium",
-  },
   gridContainer: {
     flexDirection: "row",
     paddingRight: moderateScale(20),
@@ -788,6 +705,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    overflow: "hidden",
   },
   gridIcon: {
     width: scale(32),
@@ -846,6 +764,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    overflow: "hidden",
   },
   investmentIcon: {
     width: scale(32),
@@ -877,6 +796,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     alignItems: "center",
+    overflow: "hidden",
   },
   legendContainer: {
     flexDirection: "row",
@@ -913,6 +833,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    overflow: "hidden",
   },
   transactionLeft: {
     flexDirection: "row",

@@ -212,21 +212,9 @@ export default function ProfileScreen() {
             <Text style={styles.statGridValue}>{profileData.share_quantity}</Text>
           </View>
           <View style={styles.statGridCard}>
-            <Text style={styles.statGridLabel}>Share Amount</Text>
-            <Text style={styles.statGridValue}>
-              {formatCurrency(profileData.share_amount)}
-            </Text>
-          </View>
-          <View style={styles.statGridCard}>
             <Text style={styles.statGridLabel}>Wallet Balance</Text>
             <Text style={styles.statGridValue}>
               {formatCurrency(profileData.balance)}
-            </Text>
-          </View>
-          <View style={styles.statGridCard}>
-            <Text style={styles.statGridLabel}>Status</Text>
-            <Text style={[styles.statGridValue, { color: profileData.status === "active" ? "#10B981" : "#EF4444" }]}>
-              {profileData.status.charAt(0).toUpperCase() + profileData.status.slice(1)}
             </Text>
           </View>
         </View>

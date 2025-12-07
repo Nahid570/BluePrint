@@ -21,9 +21,6 @@ export interface User {
   email: string;
   phone: string;
   investor_id: string;
-  balance: number;
-  share_quantity: number;
-  share_amount: number;
   status: "active" | "inactive";
   avatar?: string;
   address?: string;
@@ -353,18 +350,27 @@ export interface ProfitTrendData {
   profit: number;
 }
 
+export interface TransactionTypeSummary {
+  count: number;
+  amount: number;
+}
+
 export interface DashboardData {
   available_balance: number;
   available_share_quantity: number;
   available_share_amount: number;
   ongoing_clubs_count: number;
-  money_flow_graph: MoneyFlowData[];
+  pending_clubs_count: number;
+  roi: number;
+  deposit: TransactionTypeSummary;
+  share_deposit: TransactionTypeSummary;
+  withdrawal: TransactionTypeSummary;
+  share_withdrawal: TransactionTypeSummary;
+  investment: TransactionTypeSummary;
+  profit: TransactionTypeSummary;
   balance_trend_graph: BalanceTrendData[];
-  transaction_type_distribution: TransactionTypeDistribution[];
-  transaction_frequency_graph: TransactionFrequencyData[];
   investment_vs_profit_graph: InvestmentVsProfitData[];
-  deposit_vs_withdrawal_graph: DepositVsWithdrawalData[];
-  club_investment_distribution: ClubInvestmentDistribution[];
+  money_flow_graph: MoneyFlowData[];
   profit_trend_graph: ProfitTrendData[];
 }
 
