@@ -150,6 +150,14 @@ export interface UserInvestmentInfo {
   status: string | null;
 }
 
+export interface ShareStatistics {
+  total_share_qty: number;
+  total_sold_ongoing_share: number;
+  total_pending_share: number;
+  total_available_share: number;
+  remaining_percentage: number;
+}
+
 export interface ClubDetail extends Club {
   club_type: "live" | "ongoing" | "settled" | "pending";
   management_fee: number;
@@ -163,6 +171,7 @@ export interface ClubDetail extends Club {
   activities: ClubActivity[];
   members: ClubMember[];
   expenses: ClubExpense[];
+  share_statistics?: ShareStatistics;
 }
 
 export type ClubDetailResponse = ApiResponse<ClubDetail>;

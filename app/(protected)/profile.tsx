@@ -6,7 +6,6 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StatusBar,
@@ -27,6 +26,12 @@ export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState<{
+    type: "success" | "error";
+    title: string;
+    message: string;
+  }>({ type: "success", title: "", message: "" });
 
   // Fetch profile data
   const {
@@ -53,10 +58,20 @@ export default function ProfileScreen() {
           },
         };
       });
-      Alert.alert("Success", "Avatar updated successfully");
+      setFeedbackModal({
+        type: "success",
+        title: "Success",
+        message: "Avatar updated successfully",
+      });
+      setShowFeedbackModal(true);
     },
     onError: (error: any) => {
-      Alert.alert("Error", error.message || "Failed to update avatar");
+      setFeedbackModal({
+        type: "error",
+        title: "Error",
+        message: error.message || "Failed to update avatar",
+      });
+      setShowFeedbackModal(true);
     },
   });
 
@@ -73,13 +88,23 @@ export default function ProfileScreen() {
 
       // Check file size (10MB limit)
       if (file.size && file.size > 10 * 1024 * 1024) {
-        Alert.alert("Error", "Image size must be less than 10MB");
+        setFeedbackModal({
+          type: "error",
+          title: "Error",
+          message: "Image size must be less than 10MB",
+        });
+        setShowFeedbackModal(true);
         return;
       }
 
       updateAvatarMutation.mutate(file);
     } catch (err) {
-      Alert.alert("Error", "Failed to pick image");
+      setFeedbackModal({
+        type: "error",
+        title: "Error",
+        message: "Failed to pick image",
+      });
+      setShowFeedbackModal(true);
     }
   };
 
@@ -378,6 +403,44 @@ export default function ProfileScreen() {
                 <Text style={styles.modalConfirmText}>Sign Out</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={showFeedbackModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFeedbackModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <View style={[
+                styles.modalIcon,
+                { backgroundColor: feedbackModal.type === "success" ? "#ECFDF5" : "#FEF2F2" }
+              ]}>
+                <Ionicons
+                  name={feedbackModal.type === "success" ? "checkmark-circle" : "alert-circle"}
+                  size={scale(32)}
+                  color={feedbackModal.type === "success" ? "#10B981" : "#EF4444"}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.modalTitle}>{feedbackModal.title}</Text>
+            <Text style={styles.modalMessage}>{feedbackModal.message}</Text>
+
+            <TouchableOpacity
+              style={[
+                styles.feedbackModalButton,
+                { backgroundColor: feedbackModal.type === "success" ? "#10B981" : "#EF4444" }
+              ]}
+              onPress={() => setShowFeedbackModal(false)}
+            >
+              <Text style={styles.feedbackModalButtonText}>OK</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -718,6 +781,19 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
   },
   modalConfirmText: {
+    fontSize: moderateScale(14),
+    fontWeight: "600",
+    color: "#FFFFFF",
+    fontFamily: "Outfit_600SemiBold",
+  },
+  feedbackModalButton: {
+    paddingVertical: verticalScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: verticalScale(8),
+  },
+  feedbackModalButtonText: {
     fontSize: moderateScale(14),
     fontWeight: "600",
     color: "#FFFFFF",

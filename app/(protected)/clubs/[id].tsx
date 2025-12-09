@@ -5,11 +5,9 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -29,6 +27,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
+import { WebView } from "react-native-webview";
 import { useCurrency } from "../../../hooks/useCurrency";
 import {
   getClubDetail,
@@ -70,6 +69,13 @@ export default function ClubDetailScreen() {
 
   // Modal State
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
+  const [documentLoading, setDocumentLoading] = useState(true);
   const [quantity, setQuantity] = useState(0);
   const [notes, setNotes] = useState("");
   const [minQuantity, setMinQuantity] = useState(0);
@@ -144,10 +150,7 @@ export default function ClubDetailScreen() {
     onSuccess: () => {
       setSubmitError(null);
       setShowJoinModal(false);
-      Alert.alert(
-        "Success",
-        "Your request to join the club has been submitted successfully."
-      );
+      setShowSuccessModal(true);
       setNotes("");
       setQuantity(minQuantity);
 
@@ -191,6 +194,21 @@ export default function ClubDetailScreen() {
       setSubmitError(error.message || "Failed to process investment");
     },
   });
+
+  const openDocument = (url: string, title: string) => {
+    setSelectedDocument({ url, title });
+    setDocumentLoading(true);
+    setShowDocumentModal(true);
+  };
+
+  // Get viewable URL - use Google Docs viewer for PDFs
+  const getDocumentViewUrl = (url: string) => {
+    const isPdf = url.toLowerCase().endsWith('.pdf');
+    if (isPdf) {
+      return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+    }
+    return url;
+  };
 
   const handleSubmit = () => {
     setSubmitError(null);
@@ -248,7 +266,7 @@ export default function ClubDetailScreen() {
     <View key={doc.id}>
       <TouchableOpacity
         style={styles.documentItem}
-        onPress={() => Linking.openURL(doc.file_url)}
+        onPress={() => openDocument(doc.file_url, doc.title)}
       >
         <View style={styles.documentLeft}>
           <Ionicons name="document-text" size={scale(20)} color="#3B82F6" />
@@ -394,7 +412,15 @@ export default function ClubDetailScreen() {
 
   const categoryColor = getCategoryColor(club.category.color);
   const riskColor = getRiskColor(club.risk_level);
-  const sharesProgress = (club.shares_sold / club.total_shares_available) * 100;
+  
+  // Use share_statistics from API
+  const shareStats = club.share_statistics;
+  const soldPercentage = shareStats 
+    ? (100 - shareStats.remaining_percentage) 
+    : (club.shares_sold / club.total_shares_available) * 100;
+  // Cap progress bar at 100% for oversold scenarios
+  const sharesProgress = Math.min(soldPercentage, 100);
+  const isOversold = shareStats ? shareStats.total_available_share < 0 : false;
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -548,11 +574,14 @@ export default function ClubDetailScreen() {
           <View style={styles.card}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressLabel}>
-                {club.shares_sold.toLocaleString()} /{" "}
-                {club.total_shares_available.toLocaleString()} shares sold
+                {(shareStats?.total_sold_ongoing_share ?? club.shares_sold).toLocaleString()} /{" "}
+                {(shareStats?.total_share_qty ?? club.total_shares_available).toLocaleString()} shares sold
               </Text>
-              <Text style={styles.progressPercent}>
-                {sharesProgress.toFixed(1)}%
+              <Text style={[
+                styles.progressPercent,
+                isOversold && styles.oversoldText
+              ]}>
+                {soldPercentage.toFixed(1)}%
               </Text>
             </View>
             <View style={styles.progressBar}>
@@ -561,16 +590,48 @@ export default function ClubDetailScreen() {
                   styles.progressFill,
                   {
                     width: `${sharesProgress}%`,
-                    backgroundColor: categoryColor,
+                    backgroundColor: isOversold ? "#EF4444" : categoryColor,
                   },
                 ]}
               />
             </View>
-            <View style={styles.progressFooter}>
-              <Text style={styles.progressText}>
-                {club.shares_remaining.toLocaleString()} shares remaining
-              </Text>
+            <View style={styles.shareStatsContainer}>
+              <View style={styles.shareStatItem}>
+                <Text style={styles.shareStatValue}>
+                  {(shareStats?.total_share_qty ?? club.total_shares_available).toLocaleString()}
+                </Text>
+                <Text style={styles.shareStatLabel}>Total</Text>
+              </View>
+              <View style={styles.shareStatItem}>
+                <Text style={styles.shareStatValue}>
+                  {(shareStats?.total_sold_ongoing_share ?? club.shares_sold).toLocaleString()}
+                </Text>
+                <Text style={styles.shareStatLabel}>Sold</Text>
+              </View>
+              {(shareStats?.total_pending_share ?? 0) > 0 && (
+                <View style={styles.shareStatItem}>
+                  <Text style={[styles.shareStatValue, { color: "#F59E0B" }]}>
+                    {shareStats?.total_pending_share.toLocaleString()}
+                  </Text>
+                  <Text style={styles.shareStatLabel}>Pending</Text>
+                </View>
+              )}
+              <View style={styles.shareStatItem}>
+                <Text style={[
+                  styles.shareStatValue,
+                  isOversold && styles.oversoldText
+                ]}>
+                  {(shareStats?.total_available_share ?? club.shares_remaining).toLocaleString()}
+                </Text>
+                <Text style={styles.shareStatLabel}>Available</Text>
+              </View>
             </View>
+            {isOversold && (
+              <View style={styles.oversoldBadge}>
+                <Ionicons name="warning" size={scale(14)} color="#EF4444" />
+                <Text style={styles.oversoldBadgeText}>Oversold by {Math.abs(shareStats?.total_available_share ?? 0)} shares</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -763,7 +824,7 @@ export default function ClubDetailScreen() {
                     {index > 0 && <View style={styles.divider} />}
                     <TouchableOpacity
                       style={styles.documentItem}
-                      onPress={() => Linking.openURL(doc.file_url)}
+                      onPress={() => openDocument(doc.file_url, doc.title)}
                     >
                       <View style={styles.documentLeft}>
                         <Ionicons
@@ -1127,6 +1188,77 @@ export default function ClubDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Join Request Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalContent}>
+            <View style={styles.successModalIconContainer}>
+              <View style={styles.successModalIcon}>
+                <Ionicons name="checkmark-circle" size={scale(32)} color="#10B981" />
+              </View>
+            </View>
+
+            <Text style={styles.successModalTitle}>Request Submitted!</Text>
+            <Text style={styles.successModalMessage}>
+              Your request to join the club has been submitted successfully. You&apos;ll be notified once it&apos;s approved.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.successModalButton}
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={styles.successModalButtonText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Document Viewer Modal */}
+      <Modal
+        visible={showDocumentModal}
+        animationType="slide"
+        onRequestClose={() => setShowDocumentModal(false)}
+      >
+        <SafeAreaView style={styles.documentModalContainer}>
+          <View style={styles.documentModalHeader}>
+            <TouchableOpacity
+              style={styles.documentModalCloseButton}
+              onPress={() => setShowDocumentModal(false)}
+            >
+              <Ionicons name="close" size={scale(24)} color="#1E293B" />
+            </TouchableOpacity>
+            <Text style={styles.documentModalTitle} numberOfLines={1}>
+              {selectedDocument?.title || "Document"}
+            </Text>
+            <View style={{ width: scale(40) }} />
+          </View>
+          {documentLoading && (
+            <View style={styles.documentLoadingContainer}>
+              <ActivityIndicator size="large" color="#2563EB" />
+              <Text style={styles.documentLoadingText}>Loading document...</Text>
+            </View>
+          )}
+          {selectedDocument && (
+            <WebView
+              source={{ uri: getDocumentViewUrl(selectedDocument.url) }}
+              style={[styles.documentWebView, documentLoading && { opacity: 0 }]}
+              onLoadStart={() => setDocumentLoading(true)}
+              onLoadEnd={() => setDocumentLoading(false)}
+              onError={() => setDocumentLoading(false)}
+              startInLoadingState={false}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              scalesPageToFit={true}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1264,6 +1396,48 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(12),
     color: "#94A3B8",
     fontFamily: "Outfit_400Regular",
+  },
+  shareStatsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: verticalScale(12),
+    paddingTop: verticalScale(12),
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+  shareStatItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  shareStatValue: {
+    fontSize: moderateScale(16),
+    fontFamily: "Outfit_700Bold",
+    color: "#1E293B",
+  },
+  shareStatLabel: {
+    fontSize: moderateScale(11),
+    fontFamily: "Outfit_400Regular",
+    color: "#94A3B8",
+    marginTop: verticalScale(2),
+  },
+  oversoldText: {
+    color: "#EF4444",
+  },
+  oversoldBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEF2F2",
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: scale(12),
+    borderRadius: moderateScale(8),
+    marginTop: verticalScale(12),
+    gap: scale(6),
+  },
+  oversoldBadgeText: {
+    fontSize: moderateScale(12),
+    fontFamily: "Outfit_500Medium",
+    color: "#EF4444",
   },
   infoRow: {
     flexDirection: "row",
@@ -1415,6 +1589,113 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
+  },
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: moderateScale(20),
+  },
+  successModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: moderateScale(20),
+    padding: moderateScale(24),
+    width: "100%",
+    maxWidth: scale(340),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  successModalIconContainer: {
+    alignItems: "center",
+    marginBottom: verticalScale(16),
+  },
+  successModalIcon: {
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(32),
+    backgroundColor: "#ECFDF5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  successModalTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: "700",
+    color: "#1E293B",
+    textAlign: "center",
+    marginBottom: verticalScale(8),
+    fontFamily: "Outfit_700Bold",
+  },
+  successModalMessage: {
+    fontSize: moderateScale(14),
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: moderateScale(20),
+    marginBottom: verticalScale(24),
+    fontFamily: "Outfit_400Regular",
+  },
+  successModalButton: {
+    backgroundColor: "#10B981",
+    paddingVertical: verticalScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  successModalButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: "600",
+    color: "#FFFFFF",
+    fontFamily: "Outfit_600SemiBold",
+  },
+  documentModalContainer: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  documentModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    backgroundColor: "#FFFFFF",
+  },
+  documentModalCloseButton: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  documentModalTitle: {
+    flex: 1,
+    fontSize: moderateScale(16),
+    fontFamily: "Outfit_600SemiBold",
+    color: "#1E293B",
+    textAlign: "center",
+    marginHorizontal: scale(12),
+  },
+  documentLoadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    zIndex: 1,
+  },
+  documentLoadingText: {
+    marginTop: verticalScale(12),
+    fontSize: moderateScale(14),
+    fontFamily: "Outfit_400Regular",
+    color: "#64748B",
+  },
+  documentWebView: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
   },
   modalSheet: {
     backgroundColor: "#FFFFFF",
