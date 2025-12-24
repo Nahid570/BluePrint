@@ -8,6 +8,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -39,13 +40,6 @@ const getGreeting = (): string => {
   return "Good Night,";
 };
 
-// Helper function to get initial from name
-const getInitial = (name: string): string => {
-  if (!name) return "?";
-  const parts = name.trim().split(" ");
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -59,7 +53,7 @@ export default function DashboardScreen() {
     }, [])
   );
 
-  // Fetch dashboard data
+  // Fetch dashboard data - Auto-refresh every 30 seconds for fresh financial data
   const {
     data: dashboardResponse,
     isLoading: isLoadingDashboard,
@@ -68,9 +62,13 @@ export default function DashboardScreen() {
   } = useQuery({
     queryKey: ["dashboard"],
     queryFn: getDashboard,
+    // Refetch every 30 seconds to ensure fresh balance and investment data
+    refetchInterval: 30 * 1000,
+    // Always refetch when screen comes into focus
+    refetchOnMount: "always",
   });
 
-  // Fetch profile data
+  // Fetch profile data - Auto-refresh every 60 seconds
   const {
     data: profileResponse,
     isLoading: isLoadingProfile,
@@ -79,6 +77,9 @@ export default function DashboardScreen() {
   } = useQuery({
     queryKey: ["profile"],
     queryFn: getProfile,
+    // Refetch every 60 seconds for profile data
+    refetchInterval: 60 * 1000,
+    refetchOnMount: "always",
   });
 
   const dashboard = dashboardResponse?.data;
@@ -246,6 +247,17 @@ export default function DashboardScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoadingDashboard || isLoadingProfile}
+            onRefresh={() => {
+              refetchDashboard();
+              refetchProfile();
+            }}
+            tintColor="#2563EB"
+            colors={["#2563EB"]}
+          />
+        }
       >
         {/* Header */}
         <View style={styles.header}>
@@ -280,7 +292,7 @@ export default function DashboardScreen() {
                 />
               ) : (
                 <Text style={styles.avatarText}>
-                  {getInitial(userProfile.name)}
+                  {userProfile.name.charAt(0).toUpperCase()}
                 </Text>
               )}
             </TouchableOpacity>

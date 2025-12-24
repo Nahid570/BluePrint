@@ -61,7 +61,7 @@ export default function TransactionsScreen() {
       }),
   });
 
-  // Fetch filtered transactions
+  // Fetch filtered transactions - Auto-refresh every 30 seconds for fresh transaction data
   const {
     data: transactionsResponse,
     isLoading,
@@ -75,6 +75,9 @@ export default function TransactionsScreen() {
         per_page: 15,
         type: selectedFilter !== "all" ? selectedFilter : undefined,
       }),
+    // Refetch every 30 seconds to ensure fresh transaction data
+    refetchInterval: 30 * 1000,
+    refetchOnMount: "always",
   });
 
   // Use all categories for filter modal (to show correct counts)

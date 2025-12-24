@@ -55,6 +55,9 @@ export default function ClubsScreen() {
   } = useQuery({
     queryKey: ["clubs", activeFilter],
     queryFn: () => getClubs({ type: activeFilter }),
+    // Refetch every 60 seconds to ensure fresh club data
+    refetchInterval: 60 * 1000,
+    refetchOnMount: "always",
   });
 
   const clubs = clubsResponse?.data || [];

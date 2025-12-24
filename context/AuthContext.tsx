@@ -40,7 +40,8 @@ export function SessionProvider(props: React.PropsWithChildren) {
                         setSession('authenticated');
                     }
                 },
-                signOut: () => {
+                signOut: async () => {
+                    // Keep biometric token so user can use biometric login next time
                     setSession(null);
                 },
                 session,

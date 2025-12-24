@@ -5,6 +5,12 @@ export const endpoints = {
     login: "/api/investor/login",
     logout: "/api/investor/logout",
     changePassword: "/api/investor/change-password",
+    biometric: {
+      enable: "/api/investor/biometric/enable",
+      disable: "/api/investor/biometric/disable",
+      login: "/api/investor/biometric/login",
+      status: "/api/investor/biometric/status",
+    },
   },
 
   // Profile endpoints

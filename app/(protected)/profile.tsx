@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as DocumentPicker from "expo-document-picker";
+import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -18,20 +17,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale, scale, verticalScale } from "react-native-size-matters";
 import { useSession } from "../../context/AuthContext";
 import { useCurrency } from "../../hooks/useCurrency";
-import { getProfile, updateAvatar } from "../../services/api/profile";
+import { getProfile } from "../../services/api/profile";
+import { normalizeImageUrl } from "../../utils/imageUtils";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useSession();
-  const queryClient = useQueryClient();
   const { formatCurrency } = useCurrency();
   const [showSignOutModal, setShowSignOutModal] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackModal, setFeedbackModal] = useState<{
-    type: "success" | "error";
-    title: string;
-    message: string;
-  }>({ type: "success", title: "", message: "" });
 
   // Fetch profile data
   const {
@@ -43,70 +36,6 @@ export default function ProfileScreen() {
     queryKey: ["profile"],
     queryFn: getProfile,
   });
-
-  // Avatar update mutation
-  const updateAvatarMutation = useMutation({
-    mutationFn: updateAvatar,
-    onSuccess: (data) => {
-      queryClient.setQueryData(["profile"], (oldData: any) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          data: {
-            ...oldData.data,
-            avatar: data?.data?.avatar,
-          },
-        };
-      });
-      setFeedbackModal({
-        type: "success",
-        title: "Success",
-        message: "Avatar updated successfully",
-      });
-      setShowFeedbackModal(true);
-    },
-    onError: (error: any) => {
-      setFeedbackModal({
-        type: "error",
-        title: "Error",
-        message: error.message || "Failed to update avatar",
-      });
-      setShowFeedbackModal(true);
-    },
-  });
-
-  const handleAvatarUpdate = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["image/jpeg", "image/png", "image/webp"],
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) return;
-
-      const file = result.assets[0];
-
-      // Check file size (10MB limit)
-      if (file.size && file.size > 10 * 1024 * 1024) {
-        setFeedbackModal({
-          type: "error",
-          title: "Error",
-          message: "Image size must be less than 10MB",
-        });
-        setShowFeedbackModal(true);
-        return;
-      }
-
-      updateAvatarMutation.mutate(file);
-    } catch (err) {
-      setFeedbackModal({
-        type: "error",
-        title: "Error",
-        message: "Failed to pick image",
-      });
-      setShowFeedbackModal(true);
-    }
-  };
 
   const handleSignOut = () => {
     setShowSignOutModal(true);
@@ -182,33 +111,21 @@ export default function ProfileScreen() {
       >
         {/* Header Section */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.avatarContainer}
-            onPress={handleAvatarUpdate}
-            disabled={updateAvatarMutation.isPending}
-          >
+          <View style={styles.avatarContainer}>
             {profileData.avatar ? (
               <Image
-                source={{ uri: profileData.avatar }}
-                style={[styles.avatar, updateAvatarMutation.isPending && { opacity: 0.5 }]}
+                source={{ 
+                  uri: normalizeImageUrl(profileData.avatar) || undefined
+                }}
+                style={styles.avatar}
+                cachePolicy="memory-disk"
+                contentFit="cover"
               />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
                 <Text style={styles.avatarText}>
                   {profileData.name.charAt(0).toUpperCase()}
                 </Text>
-              </View>
-            )}
-
-            {updateAvatarMutation.isPending && (
-              <View style={styles.avatarLoadingOverlay}>
-                <ActivityIndicator size="small" color="#2563EB" />
-              </View>
-            )}
-
-            {!updateAvatarMutation.isPending && (
-              <View style={styles.editAvatarBadge}>
-                <Ionicons name="camera" size={scale(14)} color="#FFFFFF" />
               </View>
             )}
 
@@ -223,7 +140,7 @@ export default function ProfileScreen() {
                 ]}
               />
             </View>
-          </TouchableOpacity>
+          </View>
           <Text style={styles.name}>{profileData.name}</Text>
           <View style={styles.idBadge}>
             <Text style={styles.idText}>ID: {profileData.investor_id}</Text>
@@ -239,7 +156,7 @@ export default function ProfileScreen() {
           <View style={styles.statGridCard}>
             <Text style={styles.statGridLabel}>Wallet Balance</Text>
             <Text style={styles.statGridValue}>
-              {formatCurrency(profileData.balance)}
+              {formatCurrency(profileData.balance ?? 0)}
             </Text>
           </View>
         </View>
@@ -386,7 +303,7 @@ export default function ProfileScreen() {
 
             <Text style={styles.modalTitle}>Sign Out</Text>
             <Text style={styles.modalMessage}>
-              Are you sure you want to sign out? You'll need to log in again to access your account.
+              Are you sure you want to sign out? You&apos;ll need to log in again to access your account.
             </Text>
 
             <View style={styles.modalButtons}>
@@ -407,43 +324,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Feedback Modal */}
-      <Modal
-        visible={showFeedbackModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowFeedbackModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconContainer}>
-              <View style={[
-                styles.modalIcon,
-                { backgroundColor: feedbackModal.type === "success" ? "#ECFDF5" : "#FEF2F2" }
-              ]}>
-                <Ionicons
-                  name={feedbackModal.type === "success" ? "checkmark-circle" : "alert-circle"}
-                  size={scale(32)}
-                  color={feedbackModal.type === "success" ? "#10B981" : "#EF4444"}
-                />
-              </View>
-            </View>
-
-            <Text style={styles.modalTitle}>{feedbackModal.title}</Text>
-            <Text style={styles.modalMessage}>{feedbackModal.message}</Text>
-
-            <TouchableOpacity
-              style={[
-                styles.feedbackModalButton,
-                { backgroundColor: feedbackModal.type === "success" ? "#10B981" : "#EF4444" }
-              ]}
-              onPress={() => setShowFeedbackModal(false)}
-            >
-              <Text style={styles.feedbackModalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -686,30 +566,6 @@ const styles = StyleSheet.create({
     color: "#3B82F6",
     fontFamily: "Outfit_700Bold",
   },
-  avatarLoadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: scale(50),
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  editAvatarBadge: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    width: scale(28),
-    height: scale(28),
-    borderRadius: scale(14),
-    backgroundColor: "#2563EB",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -781,19 +637,6 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
   },
   modalConfirmText: {
-    fontSize: moderateScale(14),
-    fontWeight: "600",
-    color: "#FFFFFF",
-    fontFamily: "Outfit_600SemiBold",
-  },
-  feedbackModalButton: {
-    paddingVertical: verticalScale(14),
-    borderRadius: moderateScale(12),
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: verticalScale(8),
-  },
-  feedbackModalButtonText: {
     fontSize: moderateScale(14),
     fontWeight: "600",
     color: "#FFFFFF",

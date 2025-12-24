@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -21,25 +21,98 @@ import { moderateScale, scale, verticalScale } from "react-native-size-matters";
 import { useSession } from "../../context/AuthContext";
 import { loginInvestor } from "../../services/api/auth";
 import { LoginRequest } from "../../services/api/types";
+import {
+  enableBiometricOnBackend,
+  getBiometricType,
+  hasBiometricEnabled as checkBiometricEnabled,
+  isBiometricAvailable,
+  loginWithBiometricAuth,
+} from "../../utils/biometricAuth";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useSession();
-  const [email, setEmail] = useState("nafed25458@canvect.com");
-  const [password, setPassword] = useState("nafed25458@canvect.com");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  // Default to true initially so button shows, then update based on actual check
+  const [biometricAvailable, setBiometricAvailable] = useState(true);
+  const [biometricType, setBiometricType] = useState<string>("Biometric");
+  const [hasBiometricEnabled, setHasBiometricEnabled] = useState(false);
+
+  // Check biometric availability on mount and when screen comes into focus
+  useEffect(() => {
+    const checkBiometric = async () => {
+      try {
+        const available = await isBiometricAvailable();
+        const enabled = available ? await checkBiometricEnabled() : false;
+        const type = available ? await getBiometricType() : "Biometric";
+        
+        if (__DEV__) {
+          console.log("[Login] Biometric check:", { available, enabled, type });
+        }
+        
+        setBiometricAvailable(available);
+        setHasBiometricEnabled(enabled);
+        setBiometricType(type);
+      } catch (error) {
+        console.error("[Login] Error checking biometric:", error);
+        // On error, still show button (let user try) - better UX
+        setBiometricAvailable(true);
+        setHasBiometricEnabled(false);
+        setBiometricType("Biometric");
+      }
+    };
+    
+    checkBiometric();
+  }, []);
 
   // Login mutation with React Query
   const loginMutation = useMutation({
     mutationFn: (credentials: LoginRequest) => loginInvestor(credentials),
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       if (response.success && response.data?.token) {
+        // Enable biometric on backend (only if biometric is available and not already enabled)
+        if (biometricAvailable && !hasBiometricEnabled && email) {
+          try {
+            const companyId = response.data?.company?.id || null;
+            await enableBiometricOnBackend(email, companyId);
+            // Update state to reflect biometric is now enabled
+            setHasBiometricEnabled(true);
+          } catch (error) {
+            console.error("[Login] Failed to enable biometric:", error);
+            // Don't block login if biometric enable fails
+          }
+        }
+        
         // Token is already stored by loginInvestor function
         // Update context to mark user as signed in
         signIn(response.data.token);
         // Navigate to protected area
         router.replace("/(protected)" as any);
+      }
+    },
+  });
+
+  // Biometric login mutation
+  const biometricLoginMutation = useMutation({
+    mutationFn: () => loginWithBiometricAuth(),
+    onSuccess: (response) => {
+      if (response.success && response.data?.token) {
+        // Update local state - biometric is now confirmed to be enabled
+        setHasBiometricEnabled(true);
+        // Token is already stored by loginWithBiometricAuth
+        // Update context to mark user as signed in
+        signIn(response.data.token);
+        // Navigate to protected area
+        router.replace("/(protected)" as any);
+      }
+    },
+    onError: (error: any) => {
+      // Update local state if error indicates biometric is not enabled
+      if (error.message?.includes("not enabled") || error.message?.includes("Biometric login not enabled")) {
+        setHasBiometricEnabled(false);
       }
     },
   });
@@ -71,11 +144,42 @@ export default function LoginScreen() {
     const credentials: LoginRequest = {
       email: email.trim(),
       password: password.trim(),
-      company_id: 16, // TODO: Get this from config or user selection
+      company_id: null, // TODO: Get this from config or user selection
     };
 
     // Trigger login mutation
     loginMutation.mutate(credentials);
+  };
+
+  const handleBiometricLogin = async () => {
+    try {
+      // Clear previous errors
+      setValidationError(null);
+      biometricLoginMutation.reset();
+
+      // If biometric is not enabled locally, check if we should show a message
+      // The API endpoint requires authentication, so we can't enable it before login
+      if (!hasBiometricEnabled) {
+        setValidationError(
+          "Biometric login needs to be set up first. Please login with your email and password. After successful login, biometric will be automatically enabled for future logins."
+        );
+        return;
+      }
+
+      // Trigger biometric login mutation (handles device auth + API call)
+      biometricLoginMutation.mutate();
+    } catch (error: any) {
+      console.error("[Login] Biometric login error:", error);
+      // Show user-friendly error message
+      const errorMsg = error.message || "Biometric authentication failed";
+      if (errorMsg.includes("not enabled") || errorMsg.includes("Biometric login not enabled")) {
+        setValidationError(
+          "Biometric login is not set up yet. Please login with email and password first. After successful login, biometric will be automatically enabled for future logins."
+        );
+      } else {
+        setValidationError(errorMsg);
+      }
+    }
   };
 
   // Get the error message to display - API already provides user-friendly messages
@@ -83,6 +187,9 @@ export default function LoginScreen() {
     validationError ||
     (loginMutation.isError && loginMutation.error?.message
       ? loginMutation.error.message
+      : null) ||
+    (biometricLoginMutation.isError && biometricLoginMutation.error?.message
+      ? biometricLoginMutation.error.message
       : null);
 
   return (
@@ -221,20 +328,28 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               {/* Biometric Sign In Button */}
-              <TouchableOpacity
-                style={styles.biometricButton}
-                onPress={() => {
-                  // TODO: Implement biometric authentication
-                  console.log("Biometric sign-in pressed");
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="finger-print"
-                  size={scale(28)}
-                  color="#2563EB"
-                />
-              </TouchableOpacity>
+              {biometricAvailable && (
+                <TouchableOpacity
+                  style={styles.biometricButton}
+                  onPress={handleBiometricLogin}
+                  activeOpacity={0.7}
+                  disabled={loginMutation.isPending || biometricLoginMutation.isPending}
+                >
+                  {biometricLoginMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#2563EB" />
+                  ) : (
+                    <Ionicons
+                      name={
+                        biometricType === "Face ID"
+                          ? "face-recognition"
+                          : "finger-print"
+                      }
+                      size={scale(28)}
+                      color="#2563EB"
+                    />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </ScrollView>

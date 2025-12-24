@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "BluePrint EYE",
-    "slug": "BluePrint EYE",
+    "name": "BluePrintEye",
+    "slug": "BluePrintEye",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "blueprinteye",
@@ -19,7 +19,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "undefined"
+      "package": "com.blueprinteye.app"
     },
     "web": {
       "output": "static",
@@ -31,13 +31,14 @@
         "expo-splash-screen",
         {
           "image": "./assets/logo/blueprint.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
           "backgroundColor": "#F8FAFC",
-          "dark": {
-            "image": "./assets/logo/blueprint.png",
-            "backgroundColor": "#000000"
-          }
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
         }
       ]
     ],

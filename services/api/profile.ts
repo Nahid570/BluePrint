@@ -164,15 +164,67 @@ export const updateAvatar = async (
         },
       }
     );
+    
+    // Check if the response indicates failure
+    if (response.data && !response.data.success) {
+      // Backend returned success: false, treat it as an error
+      throw {
+        success: false,
+        code: response.data.code || 400,
+        message: response.data.message || "Failed to update avatar",
+        errors: response.data.errors,
+        response: {
+          data: response.data,
+          status: response.status,
+        },
+      };
+    }
+    
     return response.data;
   } catch (error: any) {
     if (error.response) {
       const errorData = error.response.data;
+      const contentType = error.response.headers?.["content-type"] || "";
+
+      // Check if response is HTML instead of JSON
+      if (
+        typeof errorData === "string" &&
+        (errorData.includes("<html") ||
+          errorData.includes("<!DOCTYPE") ||
+          contentType.includes("text/html"))
+      ) {
+        if (__DEV__) {
+          const requestUrl = error.config?.url
+            ? `${error.config.baseURL}${error.config.url}`
+            : "unknown";
+          console.error(
+            `[API Error] Server returned HTML instead of JSON. Request URL: ${requestUrl}`
+          );
+        }
+
+        throw {
+          success: false,
+          code: error.response.status || 500,
+          message:
+            "Server returned an unexpected response. Please verify your API base URL is correct.",
+        };
+      }
+
+      // Handle validation errors from backend (Laravel format)
+      if (typeof errorData === "object" && errorData !== null) {
+        throw {
+          success: false,
+          code: errorData.code || error.response.status,
+          message: errorData.message || "Failed to update avatar",
+          errors: errorData.errors,
+        };
+      }
+
       throw {
         success: false,
-        code: errorData.code || error.response.status,
-        message: errorData.message || "Failed to update avatar",
-        errors: errorData.errors,
+        code: error.response.status || 500,
+        message: "Failed to update avatar",
+        errors: typeof errorData === "object" && errorData !== null ? errorData.errors : undefined,
       };
     } else if (error.request) {
       throw {

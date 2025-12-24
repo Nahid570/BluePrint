@@ -34,6 +34,7 @@ import {
   investInClub,
   joinClubRequest,
 } from "../../../services/api/clubs";
+import { normalizeImageUrl } from "../../../utils/imageUtils";
 
 const getCategoryColor = (color: string) => {
   const colors: any = {
@@ -125,6 +126,9 @@ export default function ClubDetailScreen() {
     queryKey: ["club-detail", id],
     queryFn: () => getClubDetail(id!),
     enabled: !!id,
+    // Refetch every 30 seconds to ensure fresh share availability and investment data
+    refetchInterval: 30 * 1000,
+    refetchOnMount: "always",
   });
 
   const club = clubResponse?.data;
@@ -289,7 +293,7 @@ export default function ClubDetailScreen() {
         <View style={styles.memberAvatar}>
           {member.avatar ? (
             <Animated.Image
-              source={{ uri: member.avatar }}
+              source={{ uri: normalizeImageUrl(member.avatar) || undefined }}
               style={styles.avatarImage}
             />
           ) : (

@@ -12,7 +12,7 @@ export interface ApiResponse<T> {
 export interface LoginRequest {
   email: string;
   password: string;
-  company_id: number;
+  company_id: number | null;
 }
 
 export interface User {
@@ -30,6 +30,8 @@ export interface User {
   date_of_birth?: string;
   gender?: "male" | "female" | "other";
   marital_status?: "single" | "married" | "divorced" | "widowed";
+  share_quantity?: number;
+  balance?: number;
 }
 
 export interface Company {
@@ -52,6 +54,46 @@ export interface LoginResponseData {
 }
 
 export type LoginResponse = ApiResponse<LoginResponseData>;
+
+// Biometric Types
+export interface BiometricEnableRequest {
+  device_id: string;
+  device_name: string;
+  device_type: "ios" | "android";
+}
+
+export interface BiometricEnableResponse {
+  biometric_token: string;
+  device_id: string;
+  expires_at: string;
+}
+
+export interface BiometricDisableRequest {
+  device_id: string;
+}
+
+export interface BiometricLoginRequest {
+  biometric_token: string;
+  device_id: string;
+  email: string;
+  company_id: number | null;
+}
+
+export interface BiometricDevice {
+  device_id: string;
+  device_name: string;
+  device_type: string;
+  last_used_at: string;
+  expires_at: string;
+}
+
+export interface BiometricStatusResponse {
+  is_enabled: boolean;
+  devices: BiometricDevice[];
+}
+
+export type BiometricEnableResponseType = ApiResponse<BiometricEnableResponse>;
+export type BiometricStatusResponseType = ApiResponse<BiometricStatusResponse>;
 
 export interface ChangePasswordRequest {
   current_password: string;
